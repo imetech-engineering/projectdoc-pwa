@@ -1,0 +1,3 @@
+bridge/config.json
+node_modules/
+*.log

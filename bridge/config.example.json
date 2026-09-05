@@ -1,0 +1,14 @@
+{
+  "poort": 8787,
+  "host": "127.0.0.1",
+  "token": "VUL-HIER-EEN-LANG-WILLEKEURIG-TOKEN-IN",
+  "projectenMap": "C:\\Users\\<gebruiker>\\OneDrive\\01 Projecten",
+  "model": "opus",
+  "claudeCommando": "claude",
+  "maxBackups": 40,
+  "origins": [
+    "https://imetech-engineering.github.io",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080"
+  ]
+}

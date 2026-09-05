@@ -1,0 +1,12 @@
+{
+  "name": "projectdoc-bridge",
+  "version": "1.0.0",
+  "description": "Bridge tussen de projectdocumentatie-PWA en Claude Code op de eigen pc",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/test.js"
+  },
+  "engines": { "node": ">=18" }
+}

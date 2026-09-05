@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#2563EB" id="meta-theme-color" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>IMeTech Projectdoc</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" href="icons/icon-192.png" type="image/png" />
+  </head>
+  <body>
+    <div id="install-banner" class="install-banner hidden" role="dialog" aria-label="App installeren">
+      <div class="install-banner-inner">
+        <p><strong>Installeer Projectdoc</strong> op je startscherm.</p>
+        <div class="install-banner-actions">
+          <button type="button" id="btn-install" class="btn-primary">Installeren</button>
+          <button type="button" id="btn-install-dismiss" class="btn-secondary">Later</button>
+        </div>
+      </div>
+    </div>
+
+    <header class="app-header">
+      <div class="header-text">
+        <h1>Projectdoc</h1>
+        <p id="status-regel" class="sub">—</p>
+      </div>
+      <img class="header-logo" src="branding/logo-zwart.png" alt="IMeTech Engineering" width="120" height="28" id="header-logo" />
+    </header>
+
+    <div class="project-balk">
+      <button type="button" id="btn-project" class="project-knop">
+        <span class="project-label">Project</span>
+        <span id="project-naam" class="project-waarde">Kies een project</span>
+      </button>
+      <button type="button" id="btn-project-info" class="btn-icoon" aria-label="Projectgegevens" title="Projectgegevens">i</button>
+    </div>
+
+    <main>
+      <!-- ---------------------------------------------------------- loggen -->
+      <section id="panel-loggen" class="tab-panel">
+        <div class="card">
+          <div class="veld-kop">
+            <label for="notities">Wat is er gebeurd?</label>
+            <span id="notities-teller" class="hint-klein"></span>
+          </div>
+          <textarea
+            id="notities"
+            rows="7"
+            placeholder="Typ of spreek in wat er gebeurd is. Losse zinnen mogen — de rest wordt netjes gemaakt."
+          ></textarea>
+          <div class="dicteer-rij">
+            <button type="button" id="btn-dicteer" class="btn-mic" aria-pressed="false">
+              <span class="mic-punt"></span><span id="dicteer-tekst">Inspreken</span>
+            </button>
+            <button type="button" id="btn-notities-wis" class="btn-secondary btn-compact">Wissen</button>
+          </div>
+          <p id="dicteer-hint" class="hint hidden"></p>
+          <button type="button" id="btn-voorstel" class="btn-primary btn-groot">Maak logboek-entry</button>
+          <p id="concept-hint" class="hint hidden"></p>
+        </div>
+
+        <div id="voorstel-kaart" class="card hidden">
+          <div id="voorstel-duplicaat" class="waarschuwing hidden"></div>
+          <div class="voorstel-kop">
+            <h2>Voorstel</h2>
+            <span id="voorstel-meta" class="hint-klein"></span>
+          </div>
+          <div id="voorstel-inhoud" class="voorstel-inhoud"></div>
+
+          <div id="voorstel-header" class="hidden">
+            <h3>Kopgegevens bijwerken</h3>
+            <div id="voorstel-header-lijst"></div>
+          </div>
+
+          <div id="voorstel-vragen" class="hidden">
+            <h3>Claude twijfelt hierover</h3>
+            <div id="voorstel-vragen-lijst"></div>
+          </div>
+
+          <label for="voorstel-bijsturen" class="bijsturen-label">Iets anders? Zeg het hier.</label>
+          <div class="dicteer-rij">
+            <input id="voorstel-bijsturen" type="text" placeholder="Bijv. 'het waren 4 uur' of 'laat de montageplaat weg'" />
+            <button type="button" id="btn-dicteer-bijsturen" class="btn-mic btn-mic-klein" aria-pressed="false" aria-label="Inspreken">
+              <span class="mic-punt"></span>
+            </button>
+          </div>
+          <div class="knop-rij">
+            <button type="button" id="btn-opnieuw" class="btn-secondary">Opnieuw maken</button>
+            <button type="button" id="btn-opslaan" class="btn-primary">Opslaan in document</button>
+          </div>
+          <button type="button" id="btn-voorstel-weg" class="btn-tekst">Voorstel weggooien</button>
+        </div>
+
+        <div id="opslag-bevestiging" class="card kaart-goed hidden"></div>
+      </section>
+
+      <!-- ---------------------------------------------------------- vragen -->
+      <section id="panel-vragen" class="tab-panel hidden">
+        <div id="gesprek" class="gesprek"></div>
+        <div class="vraag-balk">
+          <button type="button" id="btn-dicteer-vraag" class="btn-mic btn-mic-klein" aria-pressed="false" aria-label="Inspreken">
+            <span class="mic-punt"></span>
+          </button>
+          <input id="vraag-tekst" type="text" placeholder="Stel een vraag over dit project" enterkeyhint="send" />
+          <button type="button" id="btn-vraag" class="btn-primary btn-compact">Vraag</button>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------------- instellingen -->
+      <section id="panel-instellingen" class="tab-panel hidden">
+        <div class="card">
+          <h2>Verbinding met je pc</h2>
+          <label for="cfg-url">Adres van de bridge</label>
+          <input id="cfg-url" type="url" inputmode="url" autocomplete="off" placeholder="https://projectdoc.jouwdomein.nl" />
+          <label for="cfg-token">Token</label>
+          <input id="cfg-token" type="password" autocomplete="off" placeholder="Zoals in config.json op de pc" />
+          <div class="knop-rij">
+            <button type="button" id="btn-test" class="btn-secondary">Verbinding testen</button>
+            <button type="button" id="btn-cfg-opslaan" class="btn-primary">Opslaan</button>
+          </div>
+          <p id="test-uitslag" class="hint hidden"></p>
+        </div>
+
+        <div class="card">
+          <h2>Spraak</h2>
+          <label class="schakel">
+            <input type="checkbox" id="cfg-voorlezen" />
+            <span>Antwoorden hardop voorlezen</span>
+          </label>
+          <label for="cfg-stem">Stem</label>
+          <select id="cfg-stem"></select>
+          <p class="hint" id="spraak-hint"></p>
+        </div>
+
+        <div class="card">
+          <h2>Weergave</h2>
+          <label for="cfg-thema">Thema</label>
+          <select id="cfg-thema">
+            <option value="auto">Volg het systeem</option>
+            <option value="licht">Licht</option>
+            <option value="donker">Donker</option>
+          </select>
+          <div id="install-manual" class="hint hidden">
+            Installeren: open het menu van je browser en kies <strong>Toevoegen aan startscherm</strong>.
+          </div>
+          <button type="button" id="btn-install-settings" class="btn-secondary">App installeren</button>
+        </div>
+
+        <div class="card">
+          <h2>Nieuw project</h2>
+          <p class="hint">Maakt een nieuw <code>Project_[Naam].docx</code> met de opmaak van een bestaand project en een leeg logboek.</p>
+          <label for="nieuw-naam">Projectnaam</label>
+          <input id="nieuw-naam" type="text" placeholder="Bijv. Vlakkelichtkoepel" />
+          <label for="nieuw-titel">Titel bovenaan het document</label>
+          <input id="nieuw-titel" type="text" placeholder="Bijv. Heruvent — vlakke lichtkoepel" />
+          <label for="nieuw-sjabloon">Opmaak overnemen van</label>
+          <select id="nieuw-sjabloon"></select>
+          <button type="button" id="btn-nieuw-project" class="btn-secondary">Project aanmaken</button>
+          <p id="nieuw-uitslag" class="hint hidden"></p>
+        </div>
+
+        <div class="card">
+          <h2>Over</h2>
+          <p class="hint" id="over-tekst">—</p>
+          <button type="button" id="btn-wis-lokaal" class="btn-tekst danger">Lokale gegevens wissen</button>
+        </div>
+      </section>
+    </main>
+
+    <nav class="tabbar" role="tablist">
+      <button type="button" class="tab actief" data-tab="loggen" role="tab">Loggen</button>
+      <button type="button" class="tab" data-tab="vragen" role="tab">Vragen</button>
+      <button type="button" class="tab" data-tab="instellingen" role="tab">Instellingen</button>
+    </nav>
+
+    <!-- projectkiezer -->
+    <div id="kiezer" class="overlay hidden" role="dialog" aria-label="Project kiezen">
+      <div class="overlay-blad">
+        <div class="overlay-kop">
+          <h2>Project kiezen</h2>
+          <button type="button" id="btn-kiezer-dicht" class="btn-icoon" aria-label="Sluiten">×</button>
+        </div>
+        <input id="kiezer-zoek" type="search" placeholder="Zoeken…" autocomplete="off" />
+        <div id="kiezer-lijst" class="kiezer-lijst"></div>
+        <button type="button" id="btn-kiezer-ververs" class="btn-tekst">Lijst verversen</button>
+      </div>
+    </div>
+
+    <!-- projectgegevens -->
+    <div id="infoblad" class="overlay hidden" role="dialog" aria-label="Projectgegevens">
+      <div class="overlay-blad">
+        <div class="overlay-kop">
+          <h2 id="info-titel">Project</h2>
+          <button type="button" id="btn-info-dicht" class="btn-icoon" aria-label="Sluiten">×</button>
+        </div>
+        <div id="info-inhoud"></div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden" role="status"></div>
+
+    <script src="config.js"></script>
+    <script src="js/opslag.js"></script>
+    <script src="js/bridge.js"></script>
+    <script src="js/spraak.js"></script>
+    <script src="js/install.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
