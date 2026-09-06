@@ -7,7 +7,7 @@
  * (op het abonnement waarmee op deze pc is ingelogd) het denkwerk doen.
  *
  * Rolverdeling, bewust zo:
- *   Claude  = taal — begrijpen, corrigeren, formuleren in Ivo's stijl.
+ *   Claude  = taal — begrijpen, corrigeren, formuleren in jouw stijl.
  *   Bridge  = bestanden — inlezen, wegschrijven, back-uppen.
  * Claude komt dus nooit zelf aan een bestand, en de opmaak van het document
  * kan niet stukgaan door een model dat XML probeert te bewerken.
@@ -48,6 +48,8 @@ function laadConfig() {
     poort: 8787,
     model: "opus",
     claudeCommando: "claude",
+    schrijver: "de schrijver van dit logboek",
+    initialen: "IM",
     origins: ["https://imetech-engineering.github.io", "http://localhost:8080", "http://127.0.0.1:8080"],
     maxBackups: 40,
     ...cfg,
@@ -267,6 +269,8 @@ async function afhandelen(req, res, url) {
         headerVelden: docx.headerVelden(xml),
         notities: body.notities,
         historie: body.historie,
+        schrijver: config.schrijver,
+        initialen: config.initialen,
       }),
       SCHEMA_VOORSTEL,
       claudeOpties

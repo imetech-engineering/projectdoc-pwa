@@ -69,6 +69,8 @@ Vul `config.json` in:
 |---|---|
 | `token` | Een lang, willekeurig wachtwoord dat je straks ook in de app invult |
 | `projectenMap` | De OneDrive-map waar je `Project_*.docx` bestanden staan (submappen worden meegenomen) |
+| `schrijver` | Jouw naam en bedrijf — Claude schrijft de entries in jouw stijl en noemt je zo |
+| `initialen` | Voor actielijsten, bijv. `IM` wordt "Acties IM" |
 | `model` | `opus` (beste kwaliteit) of `sonnet` (sneller, minder verbruik van je abonnement) |
 | `claudeCommando` | Alleen invullen als `claude` niet in je PATH staat |
 | `origins` | Vanaf welke webadressen de app mag verbinden |
