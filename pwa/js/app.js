@@ -60,6 +60,14 @@
     zetStatus(e.message || "Er ging iets mis", "fout");
   }
 
+  /** Kort trillinkje als bevestiging; niet elk toestel kan het, dat geeft niet. */
+  function haptic(patroon) {
+    if (!navigator.vibrate) return;
+    try {
+      navigator.vibrate(patroon);
+    } catch (_) {}
+  }
+
   /* -------------------------------------------------------------- thema */
 
   function pasThemaToe() {
@@ -664,6 +672,105 @@
     }
   }
 
+  /* ------------------------------------------ trekken om te verversen */
+
+  /**
+   * Opnieuw ophalen wat er op de pc staat: de projectenlijst (met een verse
+   * scan van de map) en het logboek van het project dat je open hebt. Wat je
+   * nog niet verstuurd had - notities, een voorstel, het gesprek - blijft
+   * staan; alleen de gegevens van de pc worden vervangen.
+   */
+  let bezigMetVerversen = false;
+  async function verversAlles() {
+    if (bezigMetVerversen || state.bezig) return;
+    if (!Bridge.ingesteld()) {
+      toast("Vul eerst het adres en het token in bij Instellingen.", true);
+      return;
+    }
+    bezigMetVerversen = true;
+    zetStatus("Verversen…", "bezig");
+    try {
+      await laadProjecten(true);
+      if (state.project) {
+        state.projectInfo = await Bridge.project(state.project);
+        state.entries = state.projectInfo.entries || [];
+        tekenLogboek();
+      }
+      toonVerbindingsstatus();
+      toast("Bijgewerkt.");
+    } catch (e) {
+      fout(e);
+    } finally {
+      bezigMetVerversen = false;
+    }
+  }
+
+  // Bij geneste scrollvakken (het logboek zit in main) mag alleen het binnenste
+  // vak op de beweging reageren, anders ververst main mee terwijl het logboek
+  // al halverwege staat.
+  const trekVakken = [];
+  let trekVak = null;
+
+  function binnensteVak(doel) {
+    for (let el = doel; el; el = el.parentElement) {
+      if (trekVakken.includes(el)) return el;
+    }
+    return null;
+  }
+
+  function bindTrekVerversen(vak) {
+    const balkje = $("pull-indicator");
+    let startY = null;
+    trekVakken.push(vak);
+
+    vak.addEventListener(
+      "touchstart",
+      (e) => {
+        if (trekVak || vak.scrollTop > 0 || state.bezig || bezigMetVerversen) return;
+        if (binnensteVak(e.target) !== vak) return;
+        // In een openstaand blad (projectkiezer, projectgegevens) hoort de
+        // beweging bij dat blad, niet bij de app eronder.
+        if (document.querySelector(".overlay:not(.hidden)")) return;
+        trekVak = vak;
+        startY = e.touches[0].clientY;
+      },
+      { passive: true }
+    );
+
+    vak.addEventListener(
+      "touchmove",
+      (e) => {
+        if (trekVak !== vak || startY == null) return;
+        const dy = e.touches[0].clientY - startY;
+        balkje.classList.toggle("hidden", dy < 50 || vak.scrollTop > 0);
+      },
+      { passive: true }
+    );
+
+    const klaar = (e) => {
+      if (trekVak !== vak || startY == null) return;
+      const dy = (e.changedTouches?.[0]?.clientY ?? startY) - startY;
+      const genoeg = dy > 80 && vak.scrollTop <= 0 && e.type === "touchend";
+      balkje.classList.add("hidden");
+      trekVak = null;
+      startY = null;
+      if (genoeg) {
+        haptic(15);
+        verversAlles();
+      }
+    };
+    vak.addEventListener("touchend", klaar);
+    vak.addEventListener("touchcancel", klaar);
+  }
+
+  function bindPullToRefresh() {
+    // Elk tabblad heeft zijn eigen scrollvak: loggen scrolt in het logboek,
+    // vragen in het gesprek, instellingen in main zelf.
+    for (const vak of [$("loggen-scroll"), $("gesprek"), document.querySelector("main")]) {
+      if (vak) bindTrekVerversen(vak);
+    }
+  }
+
   function bindGebeurtenissen() {
     document.querySelectorAll(".tab").forEach((t) =>
       t.addEventListener("click", () => naarTab(t.dataset.tab))
@@ -814,6 +921,7 @@
     }
     pasThemaToe();
     bindGebeurtenissen();
+    bindPullToRefresh();
     vulInstellingen();
     registreerServiceWorker();
     PdocInstall.init(naarTab);

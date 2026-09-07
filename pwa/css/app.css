@@ -91,6 +91,18 @@ body {
   object-fit: contain;
 }
 
+/* ------------------------------------------------- trekken om te verversen */
+
+.pull-indicator {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
 /* ------------------------------------------------------------ projectbalk */
 
 .project-balk {
