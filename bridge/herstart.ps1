@@ -44,9 +44,13 @@ Start-Sleep -Seconds 5
 $log = Join-Path $env:LOCALAPPDATA "projectdoc-bridge\bridge.log"
 if (-not (Test-Path $log)) { $log = Join-Path $hier "bridge.log" }  # oude plek
 if (Test-Path $log) {
+    # De laatste start, niet de eerste: het logbestand kan meerdere starts
+    # bevatten en dan kijk je anders naar een verouderde regel.
+    $regels = Get-Content $log
+    $laatste = ($regels | Select-String -Pattern "luistert op poort" | Select-Object -Last 1).LineNumber
     Write-Host ""
-    Write-Host "--- start van $log ---"
-    Get-Content $log -TotalCount 10
+    Write-Host "--- laatste start uit $log ---"
+    if ($laatste) { $regels | Select-Object -Skip ($laatste - 1) -First 10 } else { $regels | Select-Object -Last 10 }
 }
 
 Write-Host ""
