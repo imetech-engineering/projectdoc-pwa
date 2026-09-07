@@ -50,6 +50,7 @@ function bekendePlekken() {
   const npmMap = path.join(process.env.APPDATA || thuis, "npm");
   return [
     path.join(npmMap, "claude.cmd"),
+    path.join(npmMap, "node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe"),
     path.join(thuis, ".local", "bin", "claude.exe"),
     path.join(thuis, ".local", "bin", "claude.cmd"),
     path.join(process.env.LOCALAPPDATA || thuis, "Programs", "claude", "claude.exe"),
@@ -58,12 +59,14 @@ function bekendePlekken() {
 }
 
 /**
- * Het js-bestand waar een .cmd-shim naar wijst.
+ * Waar wijst een .cmd-shim naar?
  *
- * Zo'n shim van npm is een klein tekstbestand dat node aanroept met een pad
- * naar het echte programma. Dat pad lezen we eruit: waar dat bestand precies
- * staat verschilt per versie en per manier van installeren, dus zelf gokken
- * werkt niet.
+ * Zo'n shim van npm is een klein tekstbestand dat het echte programma
+ * aanroept. Dat kan een js-bestand zijn (dan draait node het) of een los
+ * programma. Welke van de twee, en waar het staat, verschilt per versie — dus
+ * lezen we het gewoon uit het bestand in plaats van het te raden.
+ *
+ * @returns {{pad: string, soort: "js"|"exe"}|null}
  */
 function achterDeShim(cmdPad) {
   const map = path.dirname(cmdPad);
@@ -74,6 +77,7 @@ function achterDeShim(cmdPad) {
       return false;
     }
   };
+  const soortVan = (p) => (/\.js$/i.test(p) ? "js" : "exe");
 
   let inhoud = "";
   try {
@@ -81,21 +85,21 @@ function achterDeShim(cmdPad) {
   } catch (_) {}
 
   // "%~dp0" en "%dp0%" staan voor de map waarin de shim zelf staat.
-  for (const treffer of inhoud.matchAll(/"?%[~]?dp0%?\\?([^"\s]+\.js)"?/gi)) {
-    const kandidaat = path.join(map, treffer[1].replace(/^[\\/]+/, ""));
-    if (bestaat(kandidaat)) return kandidaat;
+  for (const treffer of inhoud.matchAll(/%[~]?dp0%?[\\/]*([^"\s]+\.(?:js|exe))/gi)) {
+    const kandidaat = path.join(map, treffer[1]);
+    if (bestaat(kandidaat)) return { pad: kandidaat, soort: soortVan(kandidaat) };
   }
-  for (const treffer of inhoud.matchAll(/"([A-Za-z]:\\[^"]+\.js)"/g)) {
-    if (bestaat(treffer[1])) return treffer[1];
+  for (const treffer of inhoud.matchAll(/"([A-Za-z]:\\[^"]+\.(?:js|exe))"/g)) {
+    if (bestaat(treffer[1])) return { pad: treffer[1], soort: soortVan(treffer[1]) };
   }
 
-  // Valt er niets uit te lezen, dan de gebruikelijke indeling van npm.
-  return (
-    [
-      path.join(map, "node_modules", "@anthropic-ai", "claude-code", "cli.js"),
-      path.join(map, "..", "lib", "node_modules", "@anthropic-ai", "claude-code", "cli.js"),
-    ].find(bestaat) || null
-  );
+  // Valt er niets uit te lezen, dan de gebruikelijke indelingen van npm.
+  const kandidaat = [
+    path.join(map, "node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe"),
+    path.join(map, "node_modules", "@anthropic-ai", "claude-code", "cli.js"),
+    path.join(map, "..", "lib", "node_modules", "@anthropic-ai", "claude-code", "cli.js"),
+  ].find(bestaat);
+  return kandidaat ? { pad: kandidaat, soort: soortVan(kandidaat) } : null;
 }
 
 /**
@@ -109,8 +113,11 @@ function startwijze(uitConfig) {
   if (!pad) return null;
   if (/\.js$/i.test(pad)) return { uitvoerbaar: process.execPath, voorafArgs: [pad], shell: false, pad, route: "node" };
   if (isWindows && /\.(cmd|bat)$/i.test(pad)) {
-    const js = achterDeShim(pad);
-    if (js) return { uitvoerbaar: process.execPath, voorafArgs: [js], shell: false, pad: js, route: "node" };
+    const echt = achterDeShim(pad);
+    if (echt && echt.soort === "js") {
+      return { uitvoerbaar: process.execPath, voorafArgs: [echt.pad], shell: false, pad: echt.pad, route: "node" };
+    }
+    if (echt) return { uitvoerbaar: echt.pad, voorafArgs: [], shell: false, pad: echt.pad, route: "direct" };
     // Zonder shell:true, want dan plakt node de argumenten ongeschonden aan
     // elkaar en sneuvelen de aanhalingstekens van het JSON-schema. Zo geeft
     // node ze stuk voor stuk door en doet cmd alleen het startwerk.
