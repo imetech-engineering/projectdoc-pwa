@@ -143,18 +143,18 @@ Eenmalig in Azure, onder **App-registraties → Nieuwe registratie**:
 1. **Verificatie** → *Openbare clientstromen toestaan* op **Ja**.
 2. **API-machtigingen** → Microsoft Graph → gedelegeerd: `Mail.Read`,
    `offline_access`, `User.Read`. Daarna beheerderstoestemming verlenen.
-3. **Overzicht** → neem de *toepassings-id (client)* en de *map-id (tenant)*
-   over in `config.json`:
+3. **Overzicht** → neem de *toepassings-id (client)* en de *map-id (tenant)* over.
 
-```json
-"mail": { "aan": true, "clientId": "...", "tenantId": "...", "dagen": 60, "maxBerichten": 15 }
-```
-
-Dan op je pc:
+Dan op je pc, in de map `bridge`:
 
 ```
+powershell -ExecutionPolicy Bypass -File .\zet-mail.ps1 -ClientId <toepassings-id> -TenantId <map-id>
 node koppel-mail.js
 ```
+
+Het eerste script zet het `mail`-blok op de juiste plek in `config.json` — met
+de hand plakken gaat mis, want JSON vergeeft een vergeten komma niet. Met
+`-Uit` zet je het meelezen later weer uit zonder de id's kwijt te raken.
 
 Dat toont een code; je logt in op een ander scherm en daarna onthoudt de bridge
 de verbinding. Er komt geen wachtwoord in een bestand — alleen een
@@ -240,6 +240,7 @@ bridge/
   lib/graph.js       inloggen bij Microsoft (apparaatcode) en Graph bevragen
   lib/mail.js        berichten zoeken die bij een project horen
   koppel-mail.js     eenmalig je Outlook koppelen
+  zet-mail.ps1       het mail-blok in config.json zetten
   test/test.js       zelftest van het docx-werk
   install-autostart.ps1  meestarten met Windows aan/uit zetten
 ```

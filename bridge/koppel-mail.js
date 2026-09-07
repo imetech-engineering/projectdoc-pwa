@@ -22,7 +22,17 @@ const CONFIG_PAD = process.env.PROJECTDOC_CONFIG || path.join(__dirname, "config
     console.error(`Geen config gevonden op ${CONFIG_PAD}.`);
     process.exit(1);
   }
-  const config = JSON.parse(fs.readFileSync(CONFIG_PAD, "utf8").replace(/^﻿/, ""));
+  let config;
+  try {
+    config = JSON.parse(fs.readFileSync(CONFIG_PAD, "utf8").replace(/^\uFEFF/, ""));
+  } catch (e) {
+    console.error(`config.json is geen geldige JSON: ${e.message}`);
+    console.error("");
+    console.error("Let op: het 'mail'-blok hoort binnen de buitenste accolades te staan,");
+    console.error("met een komma achter de regel ervoor. Makkelijker gaat het met:");
+    console.error("  powershell -ExecutionPolicy Bypass -File .\\zet-mail.ps1 -ClientId <id> -TenantId <id>");
+    process.exit(1);
+  }
   const mail = config.mail || {};
   if (!mail.clientId || !mail.tenantId) {
     console.error("Zet eerst 'mail.clientId' en 'mail.tenantId' in config.json.");

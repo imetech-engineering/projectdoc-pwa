@@ -71,7 +71,7 @@ function bewaarToken(gegevens) {
 
 function leesToken() {
   try {
-    return JSON.parse(fs.readFileSync(TOKENBESTAND, "utf8").replace(/^﻿/, ""));
+    return JSON.parse(fs.readFileSync(TOKENBESTAND, "utf8").replace(/^\uFEFF/, ""));
   } catch (_) {
     return null;
   }
