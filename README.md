@@ -72,7 +72,7 @@ Vul `config.json` in:
 | `schrijver` | Jouw naam en bedrijf — Claude schrijft de entries in jouw stijl en noemt je zo |
 | `initialen` | Voor actielijsten, bijv. `IM` wordt "Acties IM" |
 | `model` | `opus` (beste kwaliteit) of `sonnet` (sneller, minder verbruik van je abonnement) |
-| `claudeCommando` | Alleen invullen als `claude` niet in je PATH staat |
+| `claudeCommando` | Alleen invullen als de bridge Claude Code niet zelf vindt. Het volledige pad; opvragen met `Get-Command claude \| Select-Object -ExpandProperty Source` |
 | `origins` | Vanaf welke webadressen de app mag verbinden |
 
 Een token maken:

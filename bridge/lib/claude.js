@@ -14,6 +14,58 @@ const path = require("node:path");
 
 const isWindows = process.platform === "win32";
 
+/**
+ * Waar staat Claude Code?
+ *
+ * Als de bridge via de taakplanner start, is het PATH vaak anders dan in je
+ * eigen terminal en is "claude" daar onvindbaar. Daarom zoeken we hem zelf op:
+ * eerst een pad uit config.json, dan het PATH, dan de plekken waar de
+ * installers hem neerzetten.
+ */
+function viaPad(naam) {
+  const mappen = (process.env.PATH || "").split(path.delimiter).filter(Boolean);
+  const staarten = isWindows
+    ? (process.env.PATHEXT || ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean)
+    : [""];
+  for (const map of mappen) {
+    for (const staart of staarten) {
+      const kandidaat = path.join(map, naam + staart);
+      try {
+        if (fs.statSync(kandidaat).isFile()) return kandidaat;
+      } catch (_) {}
+    }
+  }
+  return null;
+}
+
+function bekendePlekken() {
+  const thuis = process.env.USERPROFILE || os.homedir();
+  if (!isWindows) {
+    return [
+      path.join(thuis, ".local/bin/claude"),
+      "/usr/local/bin/claude",
+      "/opt/homebrew/bin/claude",
+    ];
+  }
+  return [
+    path.join(process.env.APPDATA || thuis, "npm", "claude.cmd"),
+    path.join(thuis, ".local", "bin", "claude.exe"),
+    path.join(thuis, ".local", "bin", "claude.cmd"),
+    path.join(process.env.LOCALAPPDATA || thuis, "Programs", "claude", "claude.exe"),
+    path.join(thuis, "AppData", "Local", "Microsoft", "WindowsApps", "claude.exe"),
+  ];
+}
+
+function zoekClaude(uitConfig) {
+  const eigen = uitConfig && uitConfig !== "claude" ? uitConfig : null;
+  if (eigen) {
+    // Een zelf ingevuld pad gaat voor, ook als het een naam is die in PATH staat.
+    if (path.isAbsolute(eigen)) return fs.existsSync(eigen) ? eigen : null;
+    return viaPad(eigen);
+  }
+  return viaPad("claude") || bekendePlekken().find((p) => fs.existsSync(p)) || null;
+}
+
 /** Lege werkmap: Claude heeft hier niets te lezen, alle context komt uit de prompt. */
 function werkmap() {
   const map = path.join(os.tmpdir(), "projectdoc-bridge");
@@ -26,6 +78,20 @@ function werkmap() {
  */
 function vraagClaude(prompt, opties = {}) {
   const { model = "opus", schema = null, timeoutMs = 240000, commando = "claude" } = opties;
+
+  const pad = zoekClaude(commando);
+  if (!pad) {
+    return Promise.reject(
+      new Error(
+        "Claude Code niet gevonden. Zet het volledige pad in config.json bij 'claudeCommando' — " +
+          "vind het met: Get-Command claude | Select-Object -ExpandProperty Source"
+      )
+    );
+  }
+  // Een .cmd start alleen via de opdrachtprompt; een .exe rechtstreeks, want
+  // dan hoeven spaties in het pad niet ontweken te worden.
+  const viaOpdrachtprompt = isWindows && /\.(cmd|bat)$/i.test(pad);
+  const uitvoerbaar = viaOpdrachtprompt && /\s/.test(pad) ? `"${pad}"` : pad;
 
   const args = [
     "-p",
@@ -45,9 +111,9 @@ function vraagClaude(prompt, opties = {}) {
 
   return new Promise((resolve, reject) => {
     const begin = Date.now();
-    const kind = spawn(commando, args, {
+    const kind = spawn(uitvoerbaar, args, {
       cwd: werkmap(),
-      shell: isWindows, // claude is op Windows een .cmd
+      shell: viaOpdrachtprompt,
       windowsHide: true,
       env: { ...process.env, CLAUDE_CODE_ENTRYPOINT: "projectdoc-bridge" },
     });
@@ -62,13 +128,7 @@ function vraagClaude(prompt, opties = {}) {
     kind.stdout.on("data", (d) => (uit += d));
     kind.stderr.on("data", (d) => (fout += d));
     kind.on("error", (e) =>
-      reject(
-        new Error(
-          e.code === "ENOENT"
-            ? "Claude Code niet gevonden. Installeer het of zet 'claudeCommando' in config.json op het volledige pad."
-            : e.message
-        )
-      )
+      reject(new Error(e.code === "ENOENT" ? `Kon Claude Code niet starten via ${pad}` : e.message))
     );
     kind.on("close", (code) => {
       clearTimeout(klok);
@@ -123,4 +183,4 @@ async function zelftest(opties = {}) {
   return tekst.trim().toLowerCase().includes("ok");
 }
 
-module.exports = { vraagClaude, vraagJson, zelftest };
+module.exports = { vraagClaude, vraagJson, zelftest, zoekClaude };

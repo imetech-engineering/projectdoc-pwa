@@ -36,6 +36,13 @@ Register-ScheduledTask -TaskName $naam -Action $actie -Trigger $trigger `
     -Settings $instellingen -Force `
     -Description "Projectdocumentatie-bridge: verbindt de telefoon-app met Claude Code en de projectmappen." | Out-Null
 
+$claude = (Get-Command claude -ErrorAction SilentlyContinue).Source
+if (-not $claude) {
+    Write-Warning "Claude Code staat niet in je PATH. De bridge zoekt hem zelf op de gebruikelijke plekken,"
+    Write-Warning "maar meldt het bij het starten als dat niet lukt; zet dan het volledige pad in config.json"
+    Write-Warning "bij 'claudeCommando'. Kijk in bridge.log."
+}
+
 Start-ScheduledTask -TaskName $naam
 
 Write-Host ""
