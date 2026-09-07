@@ -59,6 +59,10 @@
     zetConcept: (project, tekst) =>
       tekst ? schrijf("concept_" + sleutelVan(project), tekst) : verwijder("concept_" + sleutelVan(project)),
 
+    voorstel: (project) => lees("voorstel_" + sleutelVan(project), null),
+    zetVoorstel: (project, v) =>
+      v ? schrijf("voorstel_" + sleutelVan(project), v) : verwijder("voorstel_" + sleutelVan(project)),
+
     gesprek: (project) => lees("gesprek_" + sleutelVan(project), []),
     zetGesprek: (project, beurten) => schrijf("gesprek_" + sleutelVan(project), beurten.slice(-20)),
 

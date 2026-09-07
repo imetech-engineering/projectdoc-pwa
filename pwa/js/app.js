@@ -22,6 +22,7 @@
     dicteerDoel: null,
     bridgeVersie: null,
     claudeInfo: null,
+    wachtOpPc: false,
   };
 
   /* ------------------------------------------------------------ hulpjes */
@@ -172,14 +173,66 @@
     state.entries = [];
     tekenLogboek();
 
+    state.voorstel = Opslag.voorstel(naam);
+    if (state.voorstel) {
+      state.headerAan = (state.voorstel.headerWijzigingen || []).map(() => true);
+      tekenVoorstel();
+    }
+
     try {
       state.projectInfo = await Bridge.project(naam);
       state.entries = state.projectInfo.entries || [];
       tekenLogboek();
       toonVerbindingsstatus();
+      haalLopendVoorstel();
     } catch (e) {
       fout(e);
     }
+  }
+
+  /**
+   * Een voorstel dat op de pc gemaakt is terwijl de app dicht was.
+   *
+   * Een telefoon sluit de app af zodra je hem wegklikt; het antwoord onderweg
+   * is dan weg, terwijl Claude op de pc gewoon doorwerkt. Bij terugkomst vragen
+   * we daarom of er nog iets klaarstaat, in plaats van je opnieuw te laten
+   * wachten op werk dat al gedaan is.
+   */
+  let volgKlok = null;
+  async function haalLopendVoorstel() {
+    clearTimeout(volgKlok);
+    // Wel stoppen als de app zélf net iets aan het doen is, maar niet als we
+    // alleen op de pc staan te wachten — dan moeten we juist blijven kijken.
+    if (!state.project) return;
+    if (state.bezig && !state.wachtOpPc) return;
+    let uit;
+    try {
+      uit = await Bridge.laatsteVoorstel(state.project);
+    } catch (_) {
+      return;
+    }
+    if (uit.bezig) {
+      state.wachtOpPc = true;
+      bezig(true, "Je pc is nog bezig met het voorstel…");
+      volgKlok = setTimeout(haalLopendVoorstel, 4000);
+      return;
+    }
+    if (state.wachtOpPc) {
+      state.wachtOpPc = false;
+      bezig(false);
+    }
+    if (uit.foutmelding && !state.voorstel) {
+      toast(uit.foutmelding, true);
+      return;
+    }
+    // Staat er al een voorstel in beeld, dan blijft dat staan: dat is waar je
+    // net naar zat te kijken.
+    if (!uit.resultaat || state.voorstel) return;
+    state.voorstel = uit.resultaat;
+    state.headerAan = (uit.resultaat.headerWijzigingen || []).map(() => true);
+    Opslag.zetVoorstel(state.project, uit.resultaat);
+    tekenVoorstel();
+    toast("Voorstel opgehaald dat je pc had klaargezet.");
   }
 
   function toonInfo() {
@@ -260,6 +313,7 @@
 
   function verbergVoorstel() {
     state.voorstel = null;
+    Opslag.zetVoorstel(state.project, null);
     $("voorstel-kaart").classList.add("hidden");
     $("voorstel-bijsturen").value = "";
   }
@@ -290,6 +344,7 @@
     try {
       const v = await Bridge.voorstel({ project: state.project, notities, historie });
       state.voorstel = v;
+      Opslag.zetVoorstel(state.project, v);
       state.headerAan = (v.headerWijzigingen || []).map(() => true);
       tekenVoorstel();
       $("loggen-scroll").scrollTop = 0;
@@ -928,6 +983,7 @@
     if ("speechSynthesis" in window) window.speechSynthesis.onvoiceschanged = vulStemmen;
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) Spraak.stop();
+      else haalLopendVoorstel();
     });
   }
 

@@ -25,7 +25,7 @@ const mailZoeker = require("./lib/mail");
 const { gekoppeld: mailGekoppeld } = require("./lib/graph");
 const { vraagPrompt, voorstelPrompt, SCHEMA_VOORSTEL } = require("./lib/prompts");
 
-const VERSIE = "1.7.0";
+const VERSIE = "1.8.0";
 const MAX_BODY = 2 * 1024 * 1024;
 const CONFIG_PAD = process.env.PROJECTDOC_CONFIG || path.join(__dirname, "config.json");
 
@@ -139,6 +139,26 @@ function zoekProject(naam) {
     lijst.find((p) => plat(p.naam) === plat(doel)) ||
     null
   );
+}
+
+/* ------------------------------------------------------------- voorstellen */
+
+/**
+ * Het laatste voorstel per project, hier bewaard.
+ *
+ * Een telefoon sluit de app af als je hem wegklikt, en dan is het antwoord
+ * onderweg verloren — terwijl Claude hier gewoon doorwerkt. Door het resultaat
+ * vast te houden kan de app het bij terugkomst alsnog ophalen, in plaats van
+ * je dezelfde minuut nog een keer te laten wachten.
+ */
+const voorstellen = new Map();
+const VOORSTEL_BEWAARTIJD = 30 * 60 * 1000;
+
+function bewaarVoorstel(naam, gegevens) {
+  voorstellen.set(naam, { ...gegevens, tijd: Date.now() });
+  for (const [sleutel, waarde] of voorstellen) {
+    if (Date.now() - waarde.tijd > VOORSTEL_BEWAARTIJD) voorstellen.delete(sleutel);
+  }
 }
 
 /* ---------------------------------------------------------------- backups */
@@ -310,6 +330,19 @@ async function afhandelen(req, res, url) {
     };
   }
 
+  if (pad === "/api/voorstel-laatst" && req.method === "GET") {
+    const p = zoekProject(url.searchParams.get("naam"));
+    if (!p) return { fout: "Project niet gevonden" };
+    const bewaard = voorstellen.get(p.naam);
+    if (!bewaard || Date.now() - bewaard.tijd > VOORSTEL_BEWAARTIJD) return { bezig: false };
+    return {
+      bezig: !!bewaard.bezig,
+      resultaat: bewaard.resultaat || null,
+      foutmelding: bewaard.foutmelding || null,
+      ouderdomMs: Date.now() - bewaard.tijd,
+    };
+  }
+
   if (pad === "/api/voorstel" && req.method === "POST") {
     const body = await leesBody(req);
     const p = zoekProject(body.project);
@@ -317,22 +350,29 @@ async function afhandelen(req, res, url) {
     if (!String(body.notities || "").trim()) return { fout: "Geen notities meegegeven" };
     const { xml } = docx.open(p.pad);
     const header = docx.headerVelden(xml);
+    bewaarVoorstel(p.naam, { bezig: true });
     const mail = await mailVoor(p, header);
-    const { data, duurMs } = await vraagJson(
-      voorstelPrompt({
-        projectNaam: p.naam,
-        documentTekst: docx.documentTekst(xml),
-        headerVelden: header,
-        notities: body.notities,
-        historie: body.historie,
-        schrijver: config.schrijver,
-        initialen: config.initialen,
-        mail: mail.berichten,
-      }),
-      SCHEMA_VOORSTEL,
-      claudeOpties
-    );
-    return {
+    let data, duurMs;
+    try {
+      ({ data, duurMs } = await vraagJson(
+        voorstelPrompt({
+          projectNaam: p.naam,
+          documentTekst: docx.documentTekst(xml),
+          headerVelden: header,
+          notities: body.notities,
+          historie: body.historie,
+          schrijver: config.schrijver,
+          initialen: config.initialen,
+          mail: mail.berichten,
+        }),
+        SCHEMA_VOORSTEL,
+        claudeOpties
+      ));
+    } catch (e) {
+      bewaarVoorstel(p.naam, { bezig: false, foutmelding: e.message });
+      throw e;
+    }
+    const resultaat = {
       ...data,
       project: p.naam,
       bestand: p.bestand,
@@ -340,6 +380,8 @@ async function afhandelen(req, res, url) {
       mailGebruikt: mail.berichten.map(kortMail),
       mailMelding: mail.melding,
     };
+    bewaarVoorstel(p.naam, { bezig: false, resultaat });
+    return resultaat;
   }
 
   if (pad === "/api/opslaan" && req.method === "POST") {
