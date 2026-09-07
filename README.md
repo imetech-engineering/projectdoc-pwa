@@ -1,7 +1,7 @@
 # IMeTech Projectdocumentatie
 
 Projectlogboeken bijwerken en raadplegen vanaf de telefoon — met spraak, in
-natuurlijke taal, rechtstreeks in de bestaande `Project_[Naam].docx` bestanden
+natuurlijke taal, rechtstreeks in de bestaande `Project <Naam>.docx` bestanden
 in OneDrive.
 
 De app draait op je Claude-abonnement. Er is **geen API-sleutel** en er zijn
@@ -68,7 +68,7 @@ Vul `config.json` in:
 | Veld | Wat erin hoort |
 |---|---|
 | `token` | Een lang, willekeurig wachtwoord dat je straks ook in de app invult |
-| `projectenMap` | De OneDrive-map waar je `Project_*.docx` bestanden staan (submappen worden meegenomen) |
+| `projectenMap` | De OneDrive-map met je projecten. Submappen tot vijf niveaus diep worden meegenomen; mappen die `Archief` heten en bestanden met `backup` of `kopie` in de naam worden overgeslagen |
 | `schrijver` | Jouw naam en bedrijf — Claude schrijft de entries in jouw stijl en noemt je zo |
 | `initialen` | Voor actielijsten, bijv. `IM` wordt "Acties IM" |
 | `model` | `opus` (beste kwaliteit) of `sonnet` (sneller, minder verbruik van je abonnement) |
@@ -96,6 +96,11 @@ Controleren of het docx-werk klopt, zonder internet of Claude:
 ```
 node test/test.js
 ```
+
+Welke bestanden meetellen: alles dat `Project <naam>.docx` of `Project_<naam>.docx`
+heet. Kopieën (`... - kopie.docx`, `..._backup_260831.docx`) en de inhoud van
+`Archief`-mappen blijven buiten de lijst, zodat je niet per ongeluk in een oude
+versie schrijft.
 
 ### 2. De bridge bereikbaar maken vanaf je telefoon
 

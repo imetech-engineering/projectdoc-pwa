@@ -101,7 +101,11 @@
       knop.className = "kiezer-item" + (p.naam === state.project ? " actief" : "");
       knop.innerHTML = `<strong></strong><span></span>`;
       knop.querySelector("strong").textContent = p.naam;
-      knop.querySelector("span").textContent = "Bijgewerkt " + datumKort(p.gewijzigd);
+      // De map erbij: twee projecten kunnen dezelfde naam hebben in verschillende
+      // klantmappen, en dan wil je zien welke je kiest.
+      knop.querySelector("span").textContent = [p.map, "bijgewerkt " + datumKort(p.gewijzigd)]
+        .filter(Boolean)
+        .join(" · ");
       knop.addEventListener("click", () => {
         kiesProject(p.naam);
         sluitOverlay("kiezer");
@@ -169,7 +173,7 @@
         );
       }
     }
-    delen.push(`<p class="hint">Bestand: ${esc(info.bestand)}</p>`);
+    delen.push(`<p class="hint">Bestand: ${esc(info.bestand)}${info.map ? ` (map: ${esc(info.map)})` : ""}</p>`);
     $("info-inhoud").innerHTML = delen.join("");
     openOverlay("infoblad");
   }

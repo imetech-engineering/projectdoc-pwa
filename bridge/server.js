@@ -61,7 +61,14 @@ const claudeOpties = { model: config.model, commando: config.claudeCommando };
 
 /* -------------------------------------------------------------- projecten */
 
-const OVERSLAAN = new Set(["_backups", "node_modules", ".git"]);
+// Archiefmappen bevatten oudere kopieën van dezelfde projecten; die horen niet
+// in de keuzelijst thuis, anders kies je er zo eentje per ongeluk.
+const OVERSLAAN = [/^_backups$/i, /^node_modules$/i, /^\.git$/i, /^archief$/i, /^archive$/i, /^oud$/i];
+const PROJECTBESTAND = /^Project[ _].+\.docx$/i;
+// Een kopie herken je aan een markering áán het eind van de naam, eventueel
+// gevolgd door een datum: "..._backup_260831b.docx", "... - kopie.docx". Een
+// project dat toevallig over back-ups gáát blijft gewoon staan.
+const KOPIE = /[ _-](backup|bak|kopie|copy|old|oud)([ _-]?\d{0,8}[a-z]?)?\.docx$|\(\d+\)\.docx$/i;
 let projectCache = { tijd: 0, lijst: [] };
 
 function zoekProjecten(map, diepte = 0) {
@@ -76,9 +83,9 @@ function zoekProjecten(map, diepte = 0) {
     if (item.name.startsWith(".") || item.name.startsWith("~$")) continue;
     const vol = path.join(map, item.name);
     if (item.isDirectory()) {
-      if (diepte >= 4 || OVERSLAAN.has(item.name)) continue;
+      if (diepte >= 5 || OVERSLAAN.some((r) => r.test(item.name))) continue;
       uit.push(...zoekProjecten(vol, diepte + 1));
-    } else if (/^Project_.+\.docx$/i.test(item.name)) {
+    } else if (PROJECTBESTAND.test(item.name) && !KOPIE.test(item.name)) {
       let stat;
       try {
         stat = fs.statSync(vol);
@@ -86,8 +93,13 @@ function zoekProjecten(map, diepte = 0) {
         continue;
       }
       uit.push({
-        naam: item.name.replace(/^Project_/i, "").replace(/\.docx$/i, "").replace(/_/g, " "),
+        naam: item.name
+          .replace(/^Project[ _]/i, "")
+          .replace(/\.docx$/i, "")
+          .replace(/_/g, " ")
+          .trim(),
         bestand: item.name,
+        map: path.basename(path.dirname(vol)),
         pad: vol,
         gewijzigd: stat.mtime.toISOString(),
       });
@@ -108,10 +120,11 @@ function projecten(ververs = false) {
 function zoekProject(naam) {
   const doel = String(naam || "").toLowerCase().trim();
   const lijst = projecten();
+  const plat = (t) => t.toLowerCase().replace(/[\s_]+/g, "");
   return (
     lijst.find((p) => p.naam.toLowerCase() === doel) ||
     lijst.find((p) => p.bestand.toLowerCase() === doel) ||
-    lijst.find((p) => p.naam.toLowerCase().replace(/\s+/g, "") === doel.replace(/\s+/g, "")) ||
+    lijst.find((p) => plat(p.naam) === plat(doel)) ||
     null
   );
 }
@@ -220,7 +233,7 @@ async function afhandelen(req, res, url) {
   if (pad === "/api/projecten" && req.method === "GET") {
     const ververs = url.searchParams.get("ververs") === "1";
     return {
-      projecten: projecten(ververs).map(({ naam, bestand, gewijzigd }) => ({ naam, bestand, gewijzigd })),
+      projecten: projecten(ververs).map(({ naam, bestand, map, gewijzigd }) => ({ naam, bestand, map, gewijzigd })),
     };
   }
 
@@ -232,6 +245,7 @@ async function afhandelen(req, res, url) {
     return {
       naam: p.naam,
       bestand: p.bestand,
+      map: p.map,
       gewijzigd: p.gewijzigd,
       header: docx.headerVelden(xml),
       laatsteEntries: laatsteEntries(tekst, 3),
@@ -313,7 +327,10 @@ async function afhandelen(req, res, url) {
     const sjabloon = zoekProject(body.sjabloon) || projecten()[0];
     if (!sjabloon) return { fout: "Geen bestaand project om de opmaak van over te nemen" };
 
-    const bestandsnaam = `Project_${naam.replace(/\s+/g, "_")}.docx`;
+    // Neem de naamgeving over van het sjabloon: sommige mappen gebruiken een
+    // spatie na "Project", andere een underscore.
+    const scheiding = /^Project_/i.test(sjabloon.bestand) ? "_" : " ";
+    const bestandsnaam = `Project${scheiding}${naam}.docx`;
     const doel = path.join(config.projectenMap, bestandsnaam);
     if (fs.existsSync(doel)) return { fout: `${bestandsnaam} bestaat al` };
 
