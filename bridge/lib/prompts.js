@@ -172,13 +172,20 @@ ${header}
 ${documentTekst}
 </bestaand_document>${historieBlok(historie)}
 
-<ruwe_notities>
+<transcriptie_van_ivo>
 ${notities}
-</ruwe_notities>
+</transcriptie_van_ivo>
+
+De notities zijn meestal ingesproken en door spraakherkenning uitgetypt. Behandel ze als een transcriptie, niet als geschreven tekst:
+
+- Leestekens en hoofdletters ontbreken, zinnen lopen door elkaar, en er staan herhalingen in doordat de herkenning zichzelf corrigeert.
+- Namen, bedrijfsnamen, leveranciers, typenummers en vaktermen worden regelmatig fonetisch verhaspeld. Getallen worden voluit geschreven.
+- Neem de woorden dus niet letterlijk over. Leg ze naast het projectdocument hierboven: lijkt een verhaspeld woord op een naam, leverancier, typenummer of term die in dit project al voorkomt, dan is dat vrijwel zeker wat er bedoeld werd — gebruik de schrijfwijze uit het document.
+- Schrijf op wat er logischerwijs gebeurd moet zijn, in de stijl van het logboek. Een letterlijke weergave van de gesproken zinnen is niet de bedoeling.
+
+Waar een correctie de betekenis kan veranderen — een bedrag, een aantal uren, een datum, een toezegging, wie wat gaat doen — corrigeer je NIET. Neem over wat er staat en zet er een korte vraag over in "vragen".
 
 Notities worden vaak pas later ingesproken en noemen dan een dag in plaats van een datum ("gisteren", "afgelopen maandag"). Zoek die op in de tabel hierboven en gebruik die datum in de kop — reken niet zelf. Staat er helemaal geen dag bij, dan is het vandaag.
-
-De notities zijn van de schrijver zelf en komen vaak uit spraakherkenning: leestekens ontbreken, namen en vaktermen kunnen verhaspeld zijn. Corrigeer wat je met zekerheid uit de projectcontext kunt afleiden. Twijfel je over iets dat de betekenis verandert (een bedrag, een aantal uren, een toezegging, een naam), corrigeer het dan NIET maar zet er een korte vraag over in "vragen".
 
 Controleer eerst op dubbelen: staat deze gebeurtenis al in het logboek (zelfde datum én zelfde inhoud)? Zet dan duplicaat op true en leg in duplicaatToelichting uit welke bestaande entry het is. Gaat het om aanvullende informatie bij een dag die al voorkomt, dan is het geen duplicaat: maak een eigen nieuwe entry.
 

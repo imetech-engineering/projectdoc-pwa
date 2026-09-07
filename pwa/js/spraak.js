@@ -27,8 +27,36 @@
   const luisterenKan = () => !!Herkenner;
   const sprekenKan = () => "speechSynthesis" in global;
 
+  /**
+   * Twee stukken herkende tekst samenvoegen zonder te herhalen.
+   *
+   * Android levert een zin vaak groeiend aan — "vanochtend", "vanochtend met",
+   * "vanochtend met Carl" — en markeert die tussenstappen soms alle drie als
+   * afgerond. Achter elkaar plakken geeft dan de hele zin een paar keer. Daarom
+   * kijken we eerst of het nieuwe stuk een uitbreiding is van wat er al staat,
+   * of er deels overheen valt.
+   */
+  function voegSamen(basis, stuk) {
+    const b = (basis || "").trim();
+    const s = (stuk || "").trim();
+    if (!b) return s;
+    if (!s) return b;
+    if (s.startsWith(b)) return s; // groeiende versie van hetzelfde
+    if (b.endsWith(s) || b.includes(s)) return b; // staat er al
+
+    // Overlap op woordgrens: het einde van b is het begin van s.
+    const bw = b.split(/\s+/);
+    const sw = s.split(/\s+/);
+    for (let n = Math.min(bw.length, sw.length); n > 0; n--) {
+      if (bw.slice(-n).join(" ").toLowerCase() === sw.slice(0, n).join(" ").toLowerCase()) {
+        return [...bw, ...sw.slice(n)].join(" ");
+      }
+    }
+    return b + " " + s;
+  }
+
   function samen(extra) {
-    return [afgerond, ronde, extra].filter((d) => d && d.trim()).join(" ").replace(/\s+/g, " ").trim();
+    return [afgerond, ronde, extra].reduce((uit, deel) => voegSamen(uit, deel), "");
   }
 
   function start(opties = {}) {
@@ -57,10 +85,10 @@
       let voorlopig = "";
       for (let i = 0; i < e.results.length; i++) {
         const stuk = e.results[i][0]?.transcript || "";
-        if (e.results[i].isFinal) vast += stuk + " ";
-        else voorlopig += stuk;
+        if (e.results[i].isFinal) vast = voegSamen(vast, stuk);
+        else voorlopig = voegSamen(voorlopig, stuk);
       }
-      ronde = vast.trim();
+      ronde = vast;
       handlers.onTekst?.(samen(""));
       handlers.onTussentijds?.(voorlopig.trim());
     };
@@ -135,5 +163,5 @@
     if (sprekenKan()) global.speechSynthesis.cancel();
   }
 
-  global.Spraak = { luisterenKan, sprekenKan, start, stop, luistert, stemmen, spreek, stil };
+  global.Spraak = { luisterenKan, sprekenKan, start, stop, luistert, stemmen, spreek, stil, voegSamen };
 })(window);

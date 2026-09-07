@@ -455,7 +455,8 @@
       ? "Inspreken werkt het best in Chrome op Android."
       : "Deze browser kan niet naar spraak luisteren; typen kan altijd.";
     $("over-tekst").textContent =
-      "De app praat met Claude Code op je eigen pc. Er is geen API-sleutel en er zijn geen losse API-kosten — het draait op je Claude-abonnement.";
+      `Versie ${window.PDOC_CONFIG?.versie || "?"}. De app praat met Claude Code op je eigen pc. ` +
+      "Er is geen API-sleutel en er zijn geen losse API-kosten — het draait op je Claude-abonnement.";
   }
 
   function vulStemmen() {
@@ -691,11 +692,17 @@
   function registreerServiceWorker() {
     if (!("serviceWorker" in navigator)) return;
     navigator.serviceWorker.register("service-worker.js").catch(() => {});
-    let ververst = false;
+
+    // Bij een nieuwe versie de pagina één keer herladen. Zonder dat draait de
+    // oude code nog tot de volgende keer openen, en dan zit je een reparatie
+    // lang met een fout die al verholpen is.
+    const hadAlEenVersie = !!navigator.serviceWorker.controller;
+    let bezig = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (ververst) return;
-      ververst = true;
-      toast("Nieuwe versie geladen.");
+      if (bezig || !hadAlEenVersie) return;
+      bezig = true;
+      toast("Nieuwe versie — even opnieuw laden.");
+      setTimeout(() => location.reload(), 400);
     });
   }
 
