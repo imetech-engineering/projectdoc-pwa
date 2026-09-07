@@ -83,13 +83,22 @@ function achterDeShim(cmdPad) {
 function startwijze(uitConfig) {
   const pad = zoekClaude(uitConfig);
   if (!pad) return null;
-  if (/\.js$/i.test(pad)) return { uitvoerbaar: process.execPath, voorafArgs: [pad], shell: false, pad };
+  if (/\.js$/i.test(pad)) return { uitvoerbaar: process.execPath, voorafArgs: [pad], shell: false, pad, route: "node" };
   if (isWindows && /\.(cmd|bat)$/i.test(pad)) {
     const js = achterDeShim(pad);
-    if (js) return { uitvoerbaar: process.execPath, voorafArgs: [js], shell: false, pad: js };
-    return { uitvoerbaar: `"${pad}"`, voorafArgs: [], shell: true, pad };
+    if (js) return { uitvoerbaar: process.execPath, voorafArgs: [js], shell: false, pad: js, route: "node" };
+    // Zonder shell:true, want dan plakt node de argumenten ongeschonden aan
+    // elkaar en sneuvelen de aanhalingstekens van het JSON-schema. Zo geeft
+    // node ze stuk voor stuk door en doet cmd alleen het startwerk.
+    return {
+      uitvoerbaar: process.env.ComSpec || "cmd.exe",
+      voorafArgs: ["/d", "/s", "/c", pad],
+      shell: false,
+      pad,
+      route: "cmd",
+    };
   }
-  return { uitvoerbaar: pad, voorafArgs: [], shell: false, pad };
+  return { uitvoerbaar: pad, voorafArgs: [], shell: false, pad, route: "direct" };
 }
 
 function zoekClaude(uitConfig) {
@@ -158,7 +167,7 @@ function vraagClaude(prompt, opties = {}) {
     // Op de shell-route worden argumenten ongeschonden aan elkaar geplakt, dus
     // knipt de opdrachtprompt het schema af bij de eerste spatie. Het schema
     // hoort daarom spatievrij te zijn; deze controle houdt dat zo.
-    if (start.shell && /\s/.test(schemaTekst)) {
+    if (start.route === "cmd" && /\s/.test(schemaTekst)) {
       return Promise.reject(
         new Error("Het JSON-schema bevat spaties en overleeft de opdrachtprompt niet.")
       );
@@ -216,9 +225,7 @@ function vraagClaude(prompt, opties = {}) {
   });
 }
 
-/** Zelfde, maar met een JSON-schema: geeft het geparste object terug. */
-async function vraagJson(prompt, schema, opties = {}) {
-  const antwoord = await vraagClaude(prompt, { ...opties, schema });
+function leesJson(antwoord) {
   const ruw = antwoord.tekst.trim();
   // Structured output geeft kale JSON; val terug op het eerste JSON-blok als
   // er onverhoopt toch tekst omheen staat.
@@ -227,6 +234,26 @@ async function vraagJson(prompt, schema, opties = {}) {
     return { data: JSON.parse(kandidaat), kosten: antwoord.kosten, duurMs: antwoord.duurMs };
   } catch (_) {
     throw new Error(`Claude gaf geen bruikbare JSON terug: ${ruw.slice(0, 300)}`);
+  }
+}
+
+/**
+ * Zelfde, maar met een JSON-schema: geeft het geparste object terug.
+ *
+ * Het schema gaat als argument mee op de opdrachtregel, en op Windows kan dat
+ * op een ongelukkige installatie alsnog verminkt raken. Gaat het daarop mis,
+ * dan zetten we het schema gewoon in de prompt en lezen we het antwoord zelf
+ * uit — trager en iets minder streng, maar het werkt.
+ */
+async function vraagJson(prompt, schema, opties = {}) {
+  try {
+    return leesJson(await vraagClaude(prompt, { ...opties, schema }));
+  } catch (e) {
+    if (!/json.?schema|valid json|verminkt|spaties/i.test(e.message)) throw e;
+    const metSchemaInPrompt =
+      `${prompt}\n\nAntwoord uitsluitend met JSON die aan dit schema voldoet. Geen uitleg, ` +
+      `geen tekst eromheen, geen code-blok:\n${JSON.stringify(schema, null, 1)}`;
+    return leesJson(await vraagClaude(metSchemaInPrompt, opties));
   }
 }
 

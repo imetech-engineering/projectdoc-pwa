@@ -20,7 +20,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 
 const docx = require("./lib/docx");
-const { vraagClaude, vraagJson, zelftest, zoekClaude } = require("./lib/claude");
+const { vraagClaude, vraagJson, zelftest, startwijze } = require("./lib/claude");
 const { vraagPrompt, voorstelPrompt, SCHEMA_VOORSTEL } = require("./lib/prompts");
 
 const VERSIE = "1.0.0";
@@ -417,9 +417,10 @@ server.listen(config.poort, config.host || "127.0.0.1", () => {
 
   // Meteen bij het starten melden of Claude Code te vinden is. Anders merk je
   // het pas als je de eerste vraag stelt, en dat is een vervelend moment.
-  const claudePad = zoekClaude(config.claudeCommando);
-  if (claudePad) {
-    console.log(`Claude Code: ${claudePad}`);
+  const wijze = startwijze(config.claudeCommando);
+  if (wijze) {
+    const uitleg = { node: "rechtstreeks met node", cmd: "via de opdrachtprompt", direct: "rechtstreeks" };
+    console.log(`Claude Code: ${wijze.pad} (${uitleg[wijze.route] || wijze.route})`);
   } else {
     console.log("");
     console.log("LET OP: Claude Code is niet gevonden. Vragen en voorstellen gaan mislukken.");
