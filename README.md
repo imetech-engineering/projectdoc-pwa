@@ -98,7 +98,10 @@ Automatisch meestarten met Windows:
 ```
 
 Dat maakt een geplande taak die bij het inloggen begint en zonder venster
-draait; wat de bridge te melden heeft komt in `bridge.log`. Beheerdersrechten
+draait. Wat de bridge te melden heeft komt in
+`%LOCALAPPDATA%\projectdoc-bridge\bridge.log` — bewust buiten de projectmap,
+want die staat vaak in OneDrive en een bestand dat continu herschreven wordt
+synchroniseert daar niet betrouwbaar. Beheerdersrechten
 zijn niet nodig. Weghalen kan met `.\uninstall-autostart.ps1`.
 
 Na een `git pull` herstart je de bridge met:

@@ -54,7 +54,7 @@ const CONFIG_PAD = process.env.PROJECTDOC_CONFIG || path.join(__dirname, "config
     );
     console.log("");
     console.log(`De koppeling staat in ${TOKENBESTAND} — dat bestand hoort niet in git en staat in .gitignore.`);
-    console.log("Zet in config.json 'mail.aan' op true en herstart de bridge.");
+    console.log("Herstart daarna de bridge:  powershell -ExecutionPolicy Bypass -File .\\herstart.ps1");
   } catch (e) {
     console.error(`Mislukt: ${e.message}`);
     process.exit(1);

@@ -21,6 +21,7 @@
     bezig: false,
     dicteerDoel: null,
     bridgeVersie: null,
+    claudeInfo: null,
   };
 
   /* ------------------------------------------------------------ hulpjes */
@@ -98,6 +99,7 @@
     Bridge.status()
       .then((st) => {
         state.bridgeVersie = st.versie;
+        state.claudeInfo = st.claude;
         toonVersies();
         toonMailStatus(st.mail);
       })
@@ -577,9 +579,17 @@
     const regel = $("versie-regel");
     if (!regel) return;
     const app = window.PDOC_CONFIG?.versie || "?";
-    regel.textContent = state.bridgeVersie
-      ? `App ${app} · bridge ${state.bridgeVersie}`
-      : `App ${app} · bridge niet bereikt`;
+    if (!state.bridgeVersie) {
+      regel.textContent = `App ${app} · bridge niet bereikt`;
+      return;
+    }
+    const routes = { node: "node", cmd: "opdrachtprompt", direct: "direct" };
+    const claude = state.claudeInfo?.gevonden
+      ? ` · Claude via ${routes[state.claudeInfo.route] || state.claudeInfo.route}`
+      : state.claudeInfo
+        ? " · Claude niet gevonden"
+        : "";
+    regel.textContent = `App ${app} · bridge ${state.bridgeVersie}${claude}`;
   }
 
   function vulStemmen() {

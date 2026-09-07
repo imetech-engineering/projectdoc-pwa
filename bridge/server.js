@@ -25,7 +25,7 @@ const mailZoeker = require("./lib/mail");
 const { gekoppeld: mailGekoppeld } = require("./lib/graph");
 const { vraagPrompt, voorstelPrompt, SCHEMA_VOORSTEL } = require("./lib/prompts");
 
-const VERSIE = "1.4.0";
+const VERSIE = "1.5.0";
 const MAX_BODY = 2 * 1024 * 1024;
 const CONFIG_PAD = process.env.PROJECTDOC_CONFIG || path.join(__dirname, "config.json");
 
@@ -235,6 +235,7 @@ async function afhandelen(req, res, url) {
       projectenMap: config.projectenMap,
       aantalProjecten: projecten().length,
       mail: { aan: !!config.mail.aan, gekoppeld: mailGekoppeld() },
+      claude: claudeInfo(),
     };
   }
 
@@ -396,6 +397,13 @@ async function afhandelen(req, res, url) {
   }
 
   return { fout: "Onbekend verzoek", status: 404 };
+}
+
+/** Waar Claude Code staat en hoe hij gestart wordt. */
+function claudeInfo() {
+  const wijze = startwijze(config.claudeCommando);
+  if (!wijze) return { gevonden: false, route: null, pad: null };
+  return { gevonden: true, route: wijze.route, pad: wijze.pad };
 }
 
 /** Wat de app van een meegelezen bericht te zien krijgt. */

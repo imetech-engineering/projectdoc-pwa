@@ -4,7 +4,7 @@
  */
 window.PDOC_CONFIG = {
   /** Zichtbaar bij Instellingen → Over, zodat je kunt zien wat er draait. */
-  versie: "v11",
+  versie: "v12",
   /** Alleen handig bij lokaal testen; laat leeg voor de gepubliceerde app. */
   standaardBridgeUrl: "",
   /** Hoe lang de app op Claude wacht voordat hij de poging afbreekt. */

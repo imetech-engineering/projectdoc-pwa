@@ -41,11 +41,12 @@ Write-Host "Taak starten..."
 Start-ScheduledTask -TaskName $naam
 Start-Sleep -Seconds 5
 
-$log = Join-Path $hier "bridge.log"
+$log = Join-Path $env:LOCALAPPDATA "projectdoc-bridge\bridge.log"
+if (-not (Test-Path $log)) { $log = Join-Path $hier "bridge.log" }  # oude plek
 if (Test-Path $log) {
     Write-Host ""
-    Write-Host "--- start van bridge.log ---"
-    Get-Content $log -TotalCount 8
+    Write-Host "--- start van $log ---"
+    Get-Content $log -TotalCount 10
 }
 
 Write-Host ""
@@ -54,6 +55,16 @@ try {
     $status = Invoke-RestMethod "http://127.0.0.1:$poort/api/status" `
         -Headers @{ Authorization = "Bearer $($config.token)" } -TimeoutSec 10
     Write-Host "Bridge $($status.versie) draait. $($status.aantalProjecten) projecten, model $($status.model)."
+    if ($status.claude.gevonden) {
+        $uitleg = @{ node = "rechtstreeks met node"; cmd = "via de opdrachtprompt"; direct = "rechtstreeks" }
+        Write-Host "Claude Code: $($status.claude.pad)"
+        Write-Host "Gestart:     $($uitleg[[string]$status.claude.route])"
+    } else {
+        Write-Warning "Claude Code is niet gevonden. Zet het pad in config.json bij 'claudeCommando'."
+    }
+    if ($status.mail.aan) {
+        Write-Host ("Mail:        " + $(if ($status.mail.gekoppeld) { "aan en gekoppeld" } else { "aan maar nog niet gekoppeld" }))
+    }
 } catch {
     Write-Warning "De bridge antwoordt niet op poort $poort. Kijk in $log."
 }
