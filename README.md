@@ -88,8 +88,22 @@ node server.js
 ```
 
 of dubbelklik op `start-bridge.bat` — die start hem opnieuw als hij onverhoopt
-stopt. Wil je dat hij vanzelf meestart met Windows: maak een snelkoppeling naar
-`start-bridge.bat` in `shell:startup`.
+stopt.
+
+Automatisch meestarten met Windows:
+
+```
+.\install-autostart.ps1
+```
+
+Dat maakt een geplande taak die bij het inloggen begint en zonder venster
+draait; wat de bridge te melden heeft komt in `bridge.log`. Beheerdersrechten
+zijn niet nodig. Weghalen kan met `.\uninstall-autostart.ps1`.
+
+Waarom bij het inloggen en niet bij het opstarten: Claude Code gebruikt de
+inloggegevens uit je gebruikersprofiel, en daar kan een dienst zonder
+aangemeld account niet bij. Logt je pc automatisch in na een herstart, dan komt
+het op hetzelfde neer.
 
 Controleren of het docx-werk klopt, zonder internet of Claude:
 
@@ -174,6 +188,7 @@ bridge/
   lib/claude.js      aanroepen van Claude Code
   lib/prompts.js     de instructies en de stijlregels van het logboek
   test/test.js       zelftest van het docx-werk
+  install-autostart.ps1  meestarten met Windows aan/uit zetten
 ```
 
 De stijlregels van het logboek staan in `bridge/lib/prompts.js`. Klopt er iets

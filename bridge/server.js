@@ -35,7 +35,16 @@ function laadConfig() {
     console.error("Kopieer config.example.json naar config.json en vul hem in.");
     process.exit(1);
   }
-  const cfg = JSON.parse(fs.readFileSync(CONFIG_PAD, "utf8"));
+  // PowerShell schrijft met Set-Content -Encoding UTF8 een BOM aan het begin,
+  // en daar struikelt JSON.parse over. Gewoon weghalen.
+  const ruw = fs.readFileSync(CONFIG_PAD, "utf8").replace(/^\uFEFF/, "");
+  let cfg;
+  try {
+    cfg = JSON.parse(ruw);
+  } catch (e) {
+    console.error(`config.json is geen geldige JSON: ${e.message}`);
+    process.exit(1);
+  }
   if (!cfg.token || cfg.token.length < 16) {
     console.error("Zet in config.json een 'token' van minstens 16 tekens.");
     process.exit(1);
@@ -390,6 +399,14 @@ const server = http.createServer(async (req, res) => {
     console.error(`[fout] ${url.pathname}:`, e.message);
     stuur(res, 500, { fout: e.message }, origin);
   }
+});
+
+server.on("error", (e) => {
+  if (e.code === "EADDRINUSE") {
+    console.error(`Poort ${config.poort} is al bezet — draait de bridge ergens anders al?`);
+    process.exit(1);
+  }
+  throw e;
 });
 
 server.listen(config.poort, config.host || "127.0.0.1", () => {
