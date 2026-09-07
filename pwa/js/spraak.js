@@ -5,18 +5,31 @@
  * Google — dat is de enige manier die daar werkt). Uitvoer gaat via
  * SpeechSynthesis en blijft volledig op het toestel.
  *
- * Android stopt de herkenning zelf na een stilte. Daarom starten we hem weer
- * op zolang de gebruiker niet zelf op stop heeft gedrukt; anders valt hij
- * midden in een zin uit.
+ * Belangrijk detail: we plakken herkende stukken niet aan elkaar, maar bouwen
+ * de tekst elke keer opnieuw op uit alle afgeronde resultaten. Android stuurt
+ * hetzelfde stuk namelijk meermaals door terwijl het nog bijgeschaafd wordt;
+ * bij aanplakken krijg je dan dezelfde zin vijf of tien keer achter elkaar.
+ * Opnieuw opbouwen kan per definitie niet dubbel gaan.
+ *
+ * Android stopt de herkenning ook uit zichzelf na een stilte. Daarom starten we
+ * hem weer op zolang de gebruiker niet zelf op stop heeft gedrukt; wat tot dan
+ * herkend was, gaat mee als vaste basis de volgende ronde in.
  */
 (function (global) {
   const Herkenner = global.SpeechRecognition || global.webkitSpeechRecognition;
+
   let sessie = null;
   let gewenst = false;
   let handlers = {};
+  let afgerond = ""; // uit eerdere ronden, na een herstart
+  let ronde = ""; // uit de lopende ronde
 
   const luisterenKan = () => !!Herkenner;
   const sprekenKan = () => "speechSynthesis" in global;
+
+  function samen(extra) {
+    return [afgerond, ronde, extra].filter((d) => d && d.trim()).join(" ").replace(/\s+/g, " ").trim();
+  }
 
   function start(opties = {}) {
     if (!luisterenKan()) {
@@ -25,6 +38,8 @@
     }
     if (gewenst) return true;
     handlers = opties;
+    afgerond = "";
+    ronde = "";
     gewenst = true;
     open();
     return true;
@@ -37,13 +52,17 @@
     sessie.interimResults = true;
 
     sessie.onresult = (e) => {
-      let tussentijds = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const stuk = e.results[i][0].transcript;
-        if (e.results[i].isFinal) handlers.onDefinitief?.(stuk.trim());
-        else tussentijds += stuk;
+      // Alles opnieuw opbouwen uit e.results — niet aanvullen vanaf resultIndex.
+      let vast = "";
+      let voorlopig = "";
+      for (let i = 0; i < e.results.length; i++) {
+        const stuk = e.results[i][0]?.transcript || "";
+        if (e.results[i].isFinal) vast += stuk + " ";
+        else voorlopig += stuk;
       }
-      if (tussentijds) handlers.onTussentijds?.(tussentijds.trim());
+      ronde = vast.trim();
+      handlers.onTekst?.(samen(""));
+      handlers.onTussentijds?.(voorlopig.trim());
     };
 
     sessie.onerror = (e) => {
@@ -58,10 +77,13 @@
             ? "Spraakherkenning heeft internet nodig en kan er nu niet bij."
             : "Spraakherkenning stopte onverwacht."
       );
-      handlers.onEinde?.();
     };
 
     sessie.onend = () => {
+      // Wat deze ronde opleverde is nu definitief; de volgende ronde begint
+      // met een lege resultatenlijst en mag daar niet overheen schrijven.
+      afgerond = samen("");
+      ronde = "";
       if (gewenst) {
         try {
           sessie.start();

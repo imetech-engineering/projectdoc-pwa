@@ -139,7 +139,6 @@ function vraagClaude(prompt, opties = {}) {
     );
   }
 
-
   const args = [
     "-p",
     "--output-format",
@@ -154,7 +153,18 @@ function vraagClaude(prompt, opties = {}) {
     "--strict-mcp-config",
     "--disable-slash-commands",
   ];
-  if (schema) args.push("--json-schema", JSON.stringify(schema));
+  if (schema) {
+    const schemaTekst = JSON.stringify(schema);
+    // Op de shell-route worden argumenten ongeschonden aan elkaar geplakt, dus
+    // knipt de opdrachtprompt het schema af bij de eerste spatie. Het schema
+    // hoort daarom spatievrij te zijn; deze controle houdt dat zo.
+    if (start.shell && /\s/.test(schemaTekst)) {
+      return Promise.reject(
+        new Error("Het JSON-schema bevat spaties en overleeft de opdrachtprompt niet.")
+      );
+    }
+    args.push("--json-schema", schemaTekst);
+  }
 
   return new Promise((resolve, reject) => {
     const begin = Date.now();

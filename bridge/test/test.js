@@ -13,6 +13,7 @@ const path = require("node:path");
 
 const { schrijfZip, leesZip, crc32 } = require("../lib/zip");
 const docx = require("../lib/docx");
+const { SCHEMA_VOORSTEL } = require("../lib/prompts");
 
 let mislukt = 0;
 function check(omschrijving, waar) {
@@ -125,6 +126,13 @@ check("zip bevat beide onderdelen", leesZip(fs.readFileSync(uitPad)).length === 
 const leeg = docx.leegLogboek(opnieuw.xml);
 check("logboek legen laat de kop staan", docx.documentTekst(leeg).includes("Uren inschatting"));
 check("logboek legen haalt entries weg", !docx.documentTekst(leeg).includes("260905"));
+
+check("zip bevat geen zip64-velden", fs.readFileSync(uitPad).indexOf(Buffer.from([0x50, 0x4b, 0x06, 0x06])) === -1);
+
+// Het schema gaat als één argument mee op de opdrachtregel. Staat er een spatie
+// in, dan knipt de Windows-opdrachtprompt het af en krijg je "Expected '}'".
+const schemaTekst = JSON.stringify(SCHEMA_VOORSTEL);
+check("JSON-schema bevat geen witruimte", !/\s/.test(schemaTekst));
 
 fs.rmSync(map, { recursive: true, force: true });
 

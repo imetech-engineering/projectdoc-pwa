@@ -31,8 +31,8 @@ Opbouw
   "Acties ${initialen}" (de schrijver zelf), "Acties <naam>", "Openstaande punten",
   "Uitgevoerde werkzaamheden", "Afspraken", "Antwoorden op de vragen",
   "Geplande aanpassing".
-- Een sectie mag ook zonder kop, als de punten direct op de tekst volgen. Laat de
-  kop dan leeg.
+- Een sectie mag ook zonder kop, als de punten direct op de tekst volgen. Laat
+  "kop" dan leeg.
 - Een korte melding mag ook maar één regel zijn. Geen sectie is beter dan een lege.
 
 Aandachtspunten
@@ -65,7 +65,7 @@ const SCHEMA_VOORSTEL = {
           items: {
             type: "object",
             properties: {
-              kop: { type: "string", description: "Tussenkop; leeg laten als de punten direct op de tekst volgen." },
+              kop: { type: "string" },
               punten: { type: "array", items: { type: "string" } },
             },
             required: ["kop", "punten"],

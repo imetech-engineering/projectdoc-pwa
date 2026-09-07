@@ -408,6 +408,10 @@
     if (Spraak.luistert()) Spraak.stop();
     state.dicteerDoel = doel;
 
+    const veld = $(doel);
+    // Wat je al had getypt blijft staan; het ingesproken deel komt erachter.
+    const basis = veld.value.trim();
+
     const stopWeergave = () => {
       knop.setAttribute("aria-pressed", "false");
       if (labelId) $(labelId).textContent = "Inspreken";
@@ -416,17 +420,17 @@
     };
 
     const gestart = Spraak.start({
-      onDefinitief(stuk) {
-        const veld = $(doel);
-        veld.value = (veld.value.trim() + " " + stuk).trim();
+      // De volledige ingesproken tekst tot nu toe, niet alleen het nieuwe stuk.
+      // Daarom overschrijven we het veld in plaats van eraan te plakken.
+      onTekst(volledig) {
+        veld.value = [basis, volledig].filter(Boolean).join(" ");
         veld.dispatchEvent(new Event("input"));
-        $("dicteer-hint").classList.add("hidden");
       },
-      onTussentijds(stuk) {
+      onTussentijds(voorlopig) {
         if (doel !== "notities") return;
         const hint = $("dicteer-hint");
-        hint.textContent = "… " + stuk;
-        hint.classList.remove("hidden");
+        hint.textContent = voorlopig ? "… " + voorlopig : "";
+        hint.classList.toggle("hidden", !voorlopig);
       },
       onFout: (m) => toast(m, true),
       onEinde: stopWeergave,
