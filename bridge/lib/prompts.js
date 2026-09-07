@@ -125,6 +125,27 @@ function vandaag() {
   };
 }
 
+/** Gevonden mail als blok voor de prompt. Leeg als er niets gevonden is. */
+function mailBlok(berichten) {
+  if (!berichten || !berichten.length) return "";
+  const regels = berichten
+    .map((b, i) => {
+      const datum = String(b.datum).replace("T", " ").slice(0, 16);
+      return `--- ${i + 1}. ${datum} | van: ${b.van} | aan: ${b.aan || "?"}\nOnderwerp: ${b.onderwerp}\n${b.tekst}`;
+    })
+    .join("\n\n");
+  return `\n\n<mail_uit_eigen_postvak>
+Deze berichten lijken bij dit project te horen. Ze zijn er ter controle, niet om
+te verwerken: gebruik ze alleen als de notities ernaar verwijzen of als ze iets
+verduidelijken wat er onduidelijk staat. Neem namen, bedragen en datums over
+zoals ze in de mail staan — dat is de juiste schrijfwijze.
+
+Verzin geen entry over een bericht waar de notities niets over zeggen.
+
+${regels}
+</mail_uit_eigen_postvak>`;
+}
+
 function historieBlok(historie) {
   if (!historie || !historie.length) return "";
   const regels = historie
@@ -135,17 +156,17 @@ function historieBlok(historie) {
 }
 
 /** Vraag over een project — puur lezen, geen wijzigingen. */
-function vraagPrompt({ projectNaam, documentTekst, vraag, historie }) {
+function vraagPrompt({ projectNaam, documentTekst, vraag, historie, mail }) {
   const d = vandaag();
   return `Je beantwoordt vragen over projectdocumentatie. Vandaag is ${d.iso}.
 
-Hieronder staat de volledige inhoud van het projectdocument "${projectNaam}". Beantwoord de vraag alleen op basis van dit document. Weet je het niet uit dit document, zeg dat dan gewoon.
+Hieronder staat de volledige inhoud van het projectdocument "${projectNaam}", en soms recente mail uit het eigen postvak die bij het project hoort. Beantwoord de vraag daarop. Weet je het uit geen van beide, zeg dat dan gewoon. Komt het antwoord uit een mailbericht en niet uit het logboek, zeg er dan bij dat het uit de mail komt.
 
 Antwoord in het Nederlands, kort en direct — dit wordt op een telefoon gelezen en soms hardop voorgelezen. Geen opsommingen tenzij het echt een lijstje is. Noem waar relevant de datum van de logboek-entry waar het antwoord vandaan komt.
 
 <projectdocument naam="${projectNaam}">
 ${documentTekst}
-</projectdocument>${historieBlok(historie)}
+</projectdocument>${mailBlok(mail)}${historieBlok(historie)}
 
 <vraag>
 ${vraag}
@@ -153,7 +174,7 @@ ${vraag}
 }
 
 /** Voorstel voor een nieuwe logboek-entry. */
-function voorstelPrompt({ projectNaam, documentTekst, headerVelden, notities, historie, schrijver, initialen }) {
+function voorstelPrompt({ projectNaam, documentTekst, headerVelden, notities, historie, schrijver, initialen, mail }) {
   const d = vandaag();
   const header = headerVelden.map((v) => `- ${v.label}: ${v.waarde}`).join("\n") || "(geen kop-tabel gevonden)";
   return `Je maakt een logboek-entry voor het projectdocument "${projectNaam}". Vandaag is ${d.dag} ${d.iso} (JJMMDD: ${d.kort}).
@@ -170,7 +191,7 @@ ${header}
 
 <bestaand_document>
 ${documentTekst}
-</bestaand_document>${historieBlok(historie)}
+</bestaand_document>${mailBlok(mail)}${historieBlok(historie)}
 
 <transcriptie_van_ivo>
 ${notities}
@@ -196,4 +217,4 @@ Kopgegevens pas je alleen aan als de notities daar duidelijk aanleiding toe geve
 Geef bij een wijziging altijd de VOLLEDIGE nieuwe waarde van dat veld, in exact dezelfde opmaak als de huidige waarde. Is er niets te wijzigen, dan is headerWijzigingen een lege lijst.`;
 }
 
-module.exports = { vraagPrompt, voorstelPrompt, SCHEMA_VOORSTEL, stijlregels, vandaag };
+module.exports = { vraagPrompt, voorstelPrompt, SCHEMA_VOORSTEL, stijlregels, mailBlok, vandaag };

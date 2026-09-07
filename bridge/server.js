@@ -21,9 +21,11 @@ const crypto = require("node:crypto");
 
 const docx = require("./lib/docx");
 const { vraagClaude, vraagJson, zelftest, startwijze } = require("./lib/claude");
+const mailZoeker = require("./lib/mail");
+const { gekoppeld: mailGekoppeld } = require("./lib/graph");
 const { vraagPrompt, voorstelPrompt, SCHEMA_VOORSTEL } = require("./lib/prompts");
 
-const VERSIE = "1.3.0";
+const VERSIE = "1.4.0";
 const MAX_BODY = 2 * 1024 * 1024;
 const CONFIG_PAD = process.env.PROJECTDOC_CONFIG || path.join(__dirname, "config.json");
 
@@ -62,6 +64,7 @@ function laadConfig() {
     origins: ["https://imetech-engineering.github.io", "http://localhost:8080", "http://127.0.0.1:8080"],
     maxBackups: 40,
     ...cfg,
+    mail: { aan: false, dagen: 60, maxBerichten: 15, ...(cfg.mail || {}) },
   };
 }
 
@@ -231,6 +234,7 @@ async function afhandelen(req, res, url) {
       model: config.model,
       projectenMap: config.projectenMap,
       aantalProjecten: projecten().length,
+      mail: { aan: !!config.mail.aan, gekoppeld: mailGekoppeld() },
     };
   }
 
@@ -260,22 +264,49 @@ async function afhandelen(req, res, url) {
     };
   }
 
+  /**
+   * Mail is aanvulling, geen voorwaarde: gaat het ophalen mis, dan gaat de
+   * vraag of het voorstel gewoon door zonder. Wat er misging komt terug naar
+   * de app, zodat je het wel ziet.
+   */
+  async function mailVoor(project, header) {
+    if (!config.mail.aan) return { berichten: [], melding: null };
+    try {
+      const berichten = await mailZoeker.zoekVoorProject({
+        projectNaam: project.naam,
+        headerVelden: header,
+        config: config.mail,
+      });
+      return { berichten, melding: null };
+    } catch (e) {
+      console.error(`[mail] ${e.message}`);
+      return { berichten: [], melding: `Mail overslaan: ${e.message}` };
+    }
+  }
+
   if (pad === "/api/vraag" && req.method === "POST") {
     const body = await leesBody(req);
     const p = zoekProject(body.project);
     if (!p) return { fout: "Project niet gevonden" };
     if (!String(body.vraag || "").trim()) return { fout: "Geen vraag meegegeven" };
     const { xml } = docx.open(p.pad);
+    const mail = await mailVoor(p, docx.headerVelden(xml));
     const antwoord = await vraagClaude(
       vraagPrompt({
         projectNaam: p.naam,
         documentTekst: docx.documentTekst(xml),
         vraag: body.vraag,
         historie: body.historie,
+        mail: mail.berichten,
       }),
       claudeOpties
     );
-    return { antwoord: antwoord.tekst, duurMs: antwoord.duurMs };
+    return {
+      antwoord: antwoord.tekst,
+      duurMs: antwoord.duurMs,
+      mailGebruikt: mail.berichten.map(kortMail),
+      mailMelding: mail.melding,
+    };
   }
 
   if (pad === "/api/voorstel" && req.method === "POST") {
@@ -284,20 +315,30 @@ async function afhandelen(req, res, url) {
     if (!p) return { fout: "Project niet gevonden" };
     if (!String(body.notities || "").trim()) return { fout: "Geen notities meegegeven" };
     const { xml } = docx.open(p.pad);
+    const header = docx.headerVelden(xml);
+    const mail = await mailVoor(p, header);
     const { data, duurMs } = await vraagJson(
       voorstelPrompt({
         projectNaam: p.naam,
         documentTekst: docx.documentTekst(xml),
-        headerVelden: docx.headerVelden(xml),
+        headerVelden: header,
         notities: body.notities,
         historie: body.historie,
         schrijver: config.schrijver,
         initialen: config.initialen,
+        mail: mail.berichten,
       }),
       SCHEMA_VOORSTEL,
       claudeOpties
     );
-    return { ...data, project: p.naam, bestand: p.bestand, duurMs };
+    return {
+      ...data,
+      project: p.naam,
+      bestand: p.bestand,
+      duurMs,
+      mailGebruikt: mail.berichten.map(kortMail),
+      mailMelding: mail.melding,
+    };
   }
 
   if (pad === "/api/opslaan" && req.method === "POST") {
@@ -357,6 +398,11 @@ async function afhandelen(req, res, url) {
   return { fout: "Onbekend verzoek", status: 404 };
 }
 
+/** Wat de app van een meegelezen bericht te zien krijgt. */
+function kortMail(b) {
+  return { van: b.van, datum: b.datum, onderwerp: b.onderwerp, gevondenOp: b.gevondenOp };
+}
+
 const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin;
   const url = new URL(req.url, "http://localhost");
@@ -401,6 +447,13 @@ server.listen(config.poort, config.host || "127.0.0.1", () => {
   console.log(`Projectenmap: ${config.projectenMap}`);
   console.log(`Gevonden projecten: ${projecten().length}`);
   console.log(`Model: ${config.model}`);
+  console.log(
+    config.mail.aan
+      ? mailGekoppeld()
+        ? `Mail: aan, laatste ${config.mail.dagen} dagen, max ${config.mail.maxBerichten} berichten`
+        : "Mail: aangezet maar nog niet gekoppeld — draai: node koppel-mail.js"
+      : "Mail: uit"
+  );
 
   // Meteen bij het starten melden of Claude Code te vinden is. Anders merk je
   // het pas als je de eerste vraag stelt, en dat is een vervelend moment.

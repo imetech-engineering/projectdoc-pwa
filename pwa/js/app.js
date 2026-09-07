@@ -99,6 +99,7 @@
       .then((st) => {
         state.bridgeVersie = st.versie;
         toonVersies();
+        toonMailStatus(st.mail);
       })
       .catch(() => {});
     const data = await Bridge.projecten(ververs);
@@ -328,6 +329,9 @@
     }
     $("voorstel-inhoud").innerHTML = delen.join("");
 
+    tekenMail($("voorstel-mail"), $("voorstel-mail-lijst"), v.mailGebruikt);
+    if (v.mailMelding) toast(v.mailMelding, true);
+
     const wijzigingen = v.headerWijzigingen || [];
     $("voorstel-header").classList.toggle("hidden", !wijzigingen.length);
     const hl = $("voorstel-header-lijst");
@@ -359,6 +363,24 @@
       blok.querySelector("span").textContent = vraag;
       vl.appendChild(blok);
     });
+  }
+
+  /** De berichten die Claude erbij gelezen heeft, zodat je kunt controleren
+      dat hij niet de verkeerde draad heeft gepakt. */
+  function tekenMail(blok, lijst, berichten) {
+    const heeft = berichten && berichten.length;
+    blok.classList.toggle("hidden", !heeft);
+    if (!heeft) return;
+    lijst.innerHTML = "";
+    for (const b of berichten) {
+      const rij = document.createElement("div");
+      rij.className = "mail-item";
+      rij.innerHTML = "<strong></strong><span></span>";
+      rij.querySelector("strong").textContent = b.onderwerp;
+      rij.querySelector("span").textContent =
+        `${datumKort(b.datum)} · ${b.van}` + (b.gevondenOp ? ` · gevonden op "${b.gevondenOp}"` : "");
+      lijst.appendChild(rij);
+    }
   }
 
   /** Antwoorden op de vragen van Claude plus de vrije bijsturing. */
@@ -435,6 +457,12 @@
       bel.className = "bel " + (beurt.rol === "ik" ? "bel-ik" : beurt.fout ? "bel-fout" : "bel-claude");
       bel.textContent = beurt.tekst;
       el.appendChild(bel);
+      if (beurt.mail) {
+        const bron = document.createElement("div");
+        bron.className = "bel-bron";
+        bron.textContent = `${beurt.mail} mailbericht${beurt.mail === 1 ? "" : "en"} meegelezen`;
+        el.appendChild(bron);
+      }
     }
     el.scrollTop = el.scrollHeight;
   }
@@ -461,7 +489,7 @@
         vraag: tekst,
         historie: state.gesprek.slice(0, -1),
       });
-      state.gesprek.push({ rol: "claude", tekst: uit.antwoord });
+      state.gesprek.push({ rol: "claude", tekst: uit.antwoord, mail: (uit.mailGebruikt || []).length });
       if (Opslag.instellingen().voorlezen) Spraak.spreek(uit.antwoord, Opslag.instellingen().stem);
     } catch (e) {
       state.gesprek.push({ rol: "claude", tekst: e.message, fout: true });
@@ -531,6 +559,18 @@
     $("over-tekst").textContent =
       "De app praat met Claude Code op je eigen pc. Er is geen API-sleutel en er zijn geen " +
       "losse API-kosten — het draait op je Claude-abonnement.";
+  }
+
+  function toonMailStatus(status) {
+    const el = $("mail-status");
+    if (!el) return;
+    if (!status) return void (el.textContent = "");
+    el.textContent = !status.aan
+      ? "Mail meelezen staat uit."
+      : status.gekoppeld
+        ? "Mail meelezen staat aan."
+        : "Mail staat aan maar is nog niet gekoppeld — draai op je pc: node koppel-mail.js";
+    el.classList.toggle("fout", status.aan && !status.gekoppeld);
   }
 
   function toonVersies() {

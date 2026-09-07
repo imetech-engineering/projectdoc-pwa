@@ -74,6 +74,7 @@ Vul `config.json` in:
 | `model` | `opus` (beste kwaliteit) of `sonnet` (sneller, minder verbruik van je abonnement) |
 | `claudeCommando` | Alleen invullen als de bridge Claude Code niet zelf vindt. Het volledige pad; opvragen met `Get-Command claude \| Select-Object -ExpandProperty Source` |
 | `origins` | Vanaf welke webadressen de app mag verbinden |
+| `mail` | Meelezen in je eigen Outlook; standaard uit. Zie hieronder |
 
 Een token maken:
 
@@ -125,6 +126,45 @@ Welke bestanden meetellen: alles dat `Project <naam>.docx` of `Project_<naam>.do
 heet. Kopieën (`... - kopie.docx`, `..._backup_260831.docx`) en de inhoud van
 `Archief`-mappen blijven buiten de lijst, zodat je niet per ongeluk in een oude
 versie schrijft.
+
+### 1b. Mail meelezen (optioneel)
+
+Staat dit aan, dan zoekt de bridge bij elk voorstel en elke vraag in je eigen
+postvak naar berichten die bij het project horen — op het mailadres van de
+contactpersoon uit de kop-tabel en op de project- of bedrijfsnaam. Die gaan als
+context mee, zodat "zie ook de mail van vanochtend" genoeg is en namen en
+bedragen uit de mail correct worden overgenomen. In de app zie je onder het
+voorstel welke berichten erbij gepakt zijn.
+
+Alleen lezen, alleen jouw postvak. Nooit versturen, wijzigen of verwijderen.
+
+Eenmalig in Azure, onder **App-registraties → Nieuwe registratie**:
+
+1. **Verificatie** → *Openbare clientstromen toestaan* op **Ja**.
+2. **API-machtigingen** → Microsoft Graph → gedelegeerd: `Mail.Read`,
+   `offline_access`, `User.Read`. Daarna beheerderstoestemming verlenen.
+3. **Overzicht** → neem de *toepassings-id (client)* en de *map-id (tenant)*
+   over in `config.json`:
+
+```json
+"mail": { "aan": true, "clientId": "...", "tenantId": "...", "dagen": 60, "maxBerichten": 15 }
+```
+
+Dan op je pc:
+
+```
+node koppel-mail.js
+```
+
+Dat toont een code; je logt in op een ander scherm en daarna onthoudt de bridge
+de verbinding. Er komt geen wachtwoord in een bestand — alleen een
+vernieuwingstoken in `mail-token.json`, dat niet in git staat en dat je op elk
+moment kunt intrekken via je Microsoft-account (Beveiliging → Apps met
+toegang). Bewaar dat bestand net zo zorgvuldig als je e-mail zelf: wie het
+heeft, kan je mail lezen tot je de toegang intrekt.
+
+Gaat het ophalen van mail een keer mis, dan gaat het voorstel gewoon door
+zonder — met een melding in de app.
 
 ### 2. De bridge bereikbaar maken vanaf je telefoon
 
@@ -197,6 +237,9 @@ bridge/
   lib/zip.js         zip-lezer/schrijver zonder externe pakketten
   lib/claude.js      aanroepen van Claude Code
   lib/prompts.js     de instructies en de stijlregels van het logboek
+  lib/graph.js       inloggen bij Microsoft (apparaatcode) en Graph bevragen
+  lib/mail.js        berichten zoeken die bij een project horen
+  koppel-mail.js     eenmalig je Outlook koppelen
   test/test.js       zelftest van het docx-werk
   install-autostart.ps1  meestarten met Windows aan/uit zetten
 ```

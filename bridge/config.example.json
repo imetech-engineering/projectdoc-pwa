@@ -12,5 +12,12 @@
     "https://imetech-engineering.github.io",
     "http://localhost:8080",
     "http://127.0.0.1:8080"
-  ]
+  ],
+  "mail": {
+    "aan": false,
+    "clientId": "",
+    "tenantId": "",
+    "dagen": 60,
+    "maxBerichten": 15
+  }
 }

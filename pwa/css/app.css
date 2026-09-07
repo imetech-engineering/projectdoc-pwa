@@ -430,6 +430,25 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .header-wijziging .hw-label { font-weight: 600; }
 .header-wijziging .hw-reden { color: var(--text-secondary); font-size: 0.8125rem; }
 
+.mail-lijst { margin-top: 4px; }
+.mail-item {
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+.mail-item strong { display: block; font-weight: 600; }
+.mail-item span { color: var(--text-secondary); }
+
+.bel-bron {
+  align-self: flex-start;
+  max-width: 88%;
+  margin-top: -4px;
+  padding: 0 4px;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
 .vraag-blok {
   padding: 10px 12px;
   margin-bottom: 8px;
