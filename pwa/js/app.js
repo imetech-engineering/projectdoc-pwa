@@ -14,6 +14,7 @@
     projecten: [],
     project: null,
     projectInfo: null,
+    entries: [],
     voorstel: null,
     headerAan: [],
     gesprek: [],
@@ -42,6 +43,11 @@
 
   function bezig(aan, tekst) {
     state.bezig = aan;
+    const kaart = $("bezig-kaart");
+    if (kaart) {
+      kaart.classList.toggle("hidden", !aan);
+      if (aan) $("bezig-tekst").textContent = tekst || "Bezig…";
+    }
     document.querySelectorAll("button.btn-primary").forEach((b) => {
       if (b.dataset.altijdAan !== "1") b.disabled = aan;
     });
@@ -146,15 +152,19 @@
 
     const concept = Opslag.concept(naam);
     $("notities").value = concept;
-    telNotities();
+    pasHoogteAan();
     $("concept-hint").classList.toggle("hidden", !concept);
     if (concept) $("concept-hint").textContent = "Onopgeslagen notities van eerder teruggezet.";
 
     state.gesprek = Opslag.gesprek(naam);
     tekenGesprek();
+    state.entries = [];
+    tekenLogboek();
 
     try {
       state.projectInfo = await Bridge.project(naam);
+      state.entries = state.projectInfo.entries || [];
+      tekenLogboek();
       toonVerbindingsstatus();
     } catch (e) {
       fout(e);
@@ -174,17 +184,49 @@
         `<div class="info-rij"><span class="il">${esc(v.label)}</span><span class="iv">${esc(v.waarde)}</span></div>`
       );
     }
-    if (info.laatsteEntries?.length) {
-      delen.push('<h3 style="margin:14px 0 4px;font-size:.875rem;">Laatste entries</h3>');
-      for (const e of info.laatsteEntries) {
-        delen.push(
-          `<div class="info-entry"><strong>${esc(e.datum)} ${esc(e.kop)}</strong><span>${esc(e.eersteRegel || "")}</span></div>`
-        );
-      }
-    }
+    delen.push(`<p class="hint">${(info.entries || []).length} entries in het logboek.</p>`);
     delen.push(`<p class="hint">Bestand: ${esc(info.bestand)}${info.map ? ` (map: ${esc(info.map)})` : ""}</p>`);
     $("info-inhoud").innerHTML = delen.join("");
     openOverlay("infoblad");
+  }
+
+  function tekenLogboek() {
+    const el = $("logboek");
+    if (!el) return;
+    if (!state.project) {
+      el.innerHTML = '<p class="logboek-leeg">Kies eerst een project bovenaan.</p>';
+      return;
+    }
+    if (!state.entries.length) {
+      el.innerHTML =
+        '<p class="logboek-leeg">Nog geen entries in dit logboek.<br />Spreek hieronder in wat er gebeurd is.</p>';
+      return;
+    }
+    el.innerHTML = state.entries.map(entryHtml).join("");
+  }
+
+  function entryHtml(entry) {
+    const delen = [`<h3><span class="datum">${esc(entry.datum)}</span> ${esc(entry.kop)}</h3>`];
+    let punten = [];
+    const spoelPunten = () => {
+      if (!punten.length) return;
+      delen.push("<ul>" + punten.map((p) => `<li>${esc(p)}</li>`).join("") + "</ul>");
+      punten = [];
+    };
+    for (const blok of entry.blokken || []) {
+      if (blok.soort === "punt") {
+        punten.push(blok.tekst);
+        continue;
+      }
+      spoelPunten();
+      delen.push(
+        blok.soort === "kop"
+          ? `<p class="sectiekop">${esc(blok.tekst)}</p>`
+          : `<p>${esc(blok.tekst)}</p>`
+      );
+    }
+    spoelPunten();
+    return `<article class="logboek-entry">${delen.join("")}</article>`;
   }
 
   const esc = (s) =>
@@ -192,9 +234,11 @@
 
   /* ----------------------------------------------------------- voorstel */
 
-  function telNotities() {
-    const n = $("notities").value.trim().length;
-    $("notities-teller").textContent = n ? `${n} tekens` : "";
+  /** Het invoerveld groeit mee met de tekst, tot de ingestelde maximumhoogte. */
+  function pasHoogteAan() {
+    const veld = $("notities");
+    veld.style.height = "auto";
+    veld.style.height = Math.min(veld.scrollHeight, window.innerHeight * (veld.classList.contains("groot") ? 0.55 : 0.28)) + "px";
   }
 
   let conceptKlok = null;
@@ -237,7 +281,7 @@
       state.voorstel = v;
       state.headerAan = (v.headerWijzigingen || []).map(() => true);
       tekenVoorstel();
-      $("voorstel-kaart").scrollIntoView({ behavior: "smooth", block: "start" });
+      $("loggen-scroll").scrollTop = 0;
     } catch (e) {
       fout(e);
     } finally {
@@ -252,11 +296,19 @@
     $("opslag-bevestiging").classList.add("hidden");
     $("voorstel-meta").textContent = v.duurMs ? `${Math.round(v.duurMs / 1000)} sec` : "";
 
+    // Zonder kop is er niets om op te slaan; dat komt voor als Claude vindt dat
+    // het al in het logboek staat. Dan is stilzwijgend niets doen het slechtste
+    // wat de knop kan doen.
+    const leeg = !v.entry?.kop;
     const dup = $("voorstel-duplicaat");
-    dup.classList.toggle("hidden", !v.duplicaat);
-    if (v.duplicaat) {
-      dup.textContent = "Dit lijkt al in het logboek te staan. " + (v.duplicaatToelichting || "");
+    dup.classList.toggle("hidden", !v.duplicaat && !leeg);
+    if (v.duplicaat || leeg) {
+      dup.textContent = v.duplicaat
+        ? "Dit lijkt al in het logboek te staan. " + (v.duplicaatToelichting || "")
+        : "Claude heeft hier geen entry van gemaakt. Vul de notities aan of stuur hieronder bij.";
     }
+    $("btn-opslaan").disabled = leeg;
+    $("btn-opslaan").dataset.altijdAan = leeg ? "" : "1";
 
     const delen = [`<p class="v-kop">${esc(v.entry.kop)}</p>`];
     for (const a of v.entry.alineas || []) delen.push(`<p>${esc(a)}</p>`);
@@ -318,6 +370,7 @@
   async function slaVoorstelOp() {
     const v = state.voorstel;
     if (!v || !state.project) return;
+    if (!v.entry?.kop) return toast("Er is geen entry om op te slaan.", true);
     const wijzigingen = (v.headerWijzigingen || []).filter((_, i) => state.headerAan[i]);
 
     bezig(true, "Opslaan in document…");
@@ -329,7 +382,7 @@
       });
       verbergVoorstel();
       $("notities").value = "";
-      telNotities();
+      pasHoogteAan();
       Opslag.zetConcept(state.project, "");
       $("concept-hint").classList.add("hidden");
 
@@ -345,6 +398,9 @@
       toast("Entry toegevoegd aan het projectdocument.");
 
       state.projectInfo = await Bridge.project(state.project).catch(() => state.projectInfo);
+      state.entries = state.projectInfo?.entries || state.entries;
+      tekenLogboek();
+      $("loggen-scroll").scrollTop = 0;
     } catch (e) {
       fout(e);
     } finally {
@@ -409,7 +465,7 @@
 
   /* ------------------------------------------------------------- dictaat */
 
-  function dicteerNaar(doel, knop, labelId) {
+  function dicteerNaar(doel, knop) {
     if (Spraak.luistert() && state.dicteerDoel === doel) {
       Spraak.stop();
       return;
@@ -423,7 +479,7 @@
 
     const stopWeergave = () => {
       knop.setAttribute("aria-pressed", "false");
-      if (labelId) $(labelId).textContent = "Inspreken";
+      knop.title = "Inspreken";
       $("dicteer-hint").classList.add("hidden");
       state.dicteerDoel = null;
     };
@@ -447,7 +503,7 @@
 
     if (gestart) {
       knop.setAttribute("aria-pressed", "true");
-      if (labelId) $(labelId).textContent = "Stoppen";
+      knop.title = "Stoppen met inspreken";
     }
   }
 
@@ -646,19 +702,28 @@
     );
 
     $("notities").addEventListener("input", () => {
-      telNotities();
+      pasHoogteAan();
       bewaarConcept();
       $("concept-hint").classList.add("hidden");
     });
+    $("btn-groter").addEventListener("click", () => {
+      const veld = $("notities");
+      const knop = $("btn-groter");
+      const uitgeklapt = knop.getAttribute("aria-expanded") === "true";
+      knop.setAttribute("aria-expanded", uitgeklapt ? "false" : "true");
+      veld.classList.toggle("groot", !uitgeklapt);
+      knop.querySelector("use").setAttribute("href", uitgeklapt ? "#ic-groter" : "#ic-kleiner");
+      knop.title = uitgeklapt ? "Groter" : "Kleiner";
+      pasHoogteAan();
+      veld.focus();
+    });
     $("btn-notities-wis").addEventListener("click", () => {
       $("notities").value = "";
-      telNotities();
+      pasHoogteAan();
       Opslag.zetConcept(state.project, "");
       $("concept-hint").classList.add("hidden");
     });
-    $("btn-dicteer").addEventListener("click", () =>
-      dicteerNaar("notities", $("btn-dicteer"), "dicteer-tekst")
-    );
+    $("btn-dicteer").addEventListener("click", () => dicteerNaar("notities", $("btn-dicteer")));
     $("btn-dicteer-bijsturen").addEventListener("click", () =>
       dicteerNaar("voorstel-bijsturen", $("btn-dicteer-bijsturen"))
     );

@@ -127,6 +127,9 @@ body {
   text-overflow: ellipsis;
 }
 .btn-icoon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   width: var(--touch);
   min-height: var(--touch);
@@ -162,6 +165,90 @@ body:has(#install-banner:not(.hidden)) .tab-panel {
   text-align: center;
 }
 #panel-vragen { display: flex; flex-direction: column; height: 100%; padding: 0; }
+
+/* ------------------------------------------------------------- loggen */
+
+.panel-vol { display: flex; flex-direction: column; height: 100%; padding: 0; }
+.loggen-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 12px 4px;
+}
+
+.logboek-entry {
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  line-height: 1.5;
+}
+.logboek-entry h3 {
+  margin: 0 0 6px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.logboek-entry .datum {
+  display: inline-block;
+  margin-right: 6px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+.logboek-entry p { margin: 0 0 7px; font-size: 0.9375rem; }
+.logboek-entry p.sectiekop { margin: 10px 0 4px; font-weight: 700; font-size: 0.875rem; }
+.logboek-entry ul { margin: 0 0 7px; padding-left: 20px; font-size: 0.9375rem; }
+.logboek-entry li { margin-bottom: 3px; }
+.logboek-leeg { padding: 28px 16px; text-align: center; color: var(--text-tertiary); font-size: 0.875rem; line-height: 1.5; }
+
+.kaart-concept { border: 2px dashed var(--accent); background: var(--accent-light); }
+.kaart-bezig { display: flex; align-items: center; gap: 12px; color: var(--text-secondary); }
+
+.spinner {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: draai 0.8s linear infinite;
+}
+@keyframes draai { to { transform: rotate(360deg); } }
+
+.invoer-balk {
+  flex-shrink: 0;
+  padding: 10px 12px calc(10px + var(--safe-bottom));
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border);
+}
+.invoer-veld { position: relative; }
+.invoer-veld textarea {
+  min-height: var(--touch);
+  max-height: 28vh;
+  padding-right: 44px;
+  resize: none;
+  overflow-y: auto;
+  transition: max-height 0.15s ease;
+}
+.invoer-veld textarea.groot { max-height: 55vh; }
+.btn-groter {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.btn-groter[aria-expanded="true"] { color: var(--accent); }
+.invoer-knoppen { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+.invoer-knoppen .btn-primary { flex: 1; }
 
 .card {
   background: var(--bg-primary);
@@ -202,6 +289,52 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .hint.goed { color: var(--goed); }
 .hint-klein { font-size: 0.75rem; color: var(--text-tertiary); }
 
+/* -------------------------------------------------------------- iconen */
+
+.ic-sprite { display: none; }
+.ic {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Ronde icoonknop met een aanraakvlak van 44px, ook al is het icoon kleiner. */
+.btn-rond {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--touch);
+  height: var(--touch);
+  padding: 0;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.btn-rond:active { background: var(--bg-hover); }
+.btn-rond[aria-pressed="true"] {
+  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+  animation: pulseer 1.1s ease-in-out infinite;
+}
+.btn-rond-primair {
+  width: var(--touch);
+  height: var(--touch);
+  padding: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* ------------------------------------------------------------------ knoppen */
 
 .btn-primary, .btn-secondary {
@@ -212,14 +345,25 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
   border-radius: var(--radius-md);
   cursor: pointer;
 }
-.btn-primary { color: #fff; background: var(--accent); border: 1px solid var(--accent); }
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+}
 .btn-primary:active { background: var(--accent-hover); }
 .btn-primary:disabled, .btn-secondary:disabled { opacity: 0.5; }
 .btn-secondary { color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--border-strong); }
 .btn-compact { padding: 8px 12px; font-size: 0.875rem; }
 .btn-groot { width: 100%; margin-top: 12px; font-size: 1rem; }
 .btn-tekst {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   width: 100%;
   margin-top: 10px;
   padding: 8px;
@@ -231,38 +375,14 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
   cursor: pointer;
 }
 .btn-tekst.danger { color: var(--danger); }
-.knop-rij { display: flex; gap: 8px; margin-top: 12px; }
-.knop-rij > * { flex: 1; }
+.knop-rij { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+.knop-rij .btn-primary, .knop-rij .btn-secondary { flex: 1; }
 
 /* -------------------------------------------------------------------- mic */
 
 .dicteer-rij { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
 .dicteer-rij input { flex: 1; min-width: 0; }
-.btn-mic {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: var(--touch);
-  padding: 8px 16px;
-  font: inherit;
-  font-weight: 600;
-  color: var(--text-primary);
-  background: var(--bg-primary);
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  cursor: pointer;
-}
-.btn-mic[aria-pressed="true"] { color: #fff; background: var(--danger); border-color: var(--danger); }
-.btn-mic-klein { flex-shrink: 0; padding: 8px; width: var(--touch); justify-content: center; }
-.mic-punt {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--text-tertiary);
-  flex-shrink: 0;
-}
-.btn-mic[aria-pressed="true"] .mic-punt { background: #fff; animation: pulseer 1.1s ease-in-out infinite; }
-@keyframes pulseer { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+@keyframes pulseer { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
 
 /* --------------------------------------------------------------- voorstel */
 

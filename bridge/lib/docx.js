@@ -279,6 +279,40 @@ function leegLogboek(xml) {
   return xml.slice(0, knip) + xml.slice(sectie ? sectie.start : bodyEind);
 }
 
+/**
+ * Het logboek als losse entries, nieuwste eerst — zoals het in het document
+ * staat. Per entry blijft bewaard wat een tussenkop is en wat een
+ * opsommingspunt, zodat de app het net zo kan tonen als Word het toont.
+ */
+function logboekEntries(xml, max = 60) {
+  const { kinderen } = bodyKinderen(xml);
+  const start = logboekStart(kinderen);
+  const entries = [];
+  let huidig = null;
+
+  for (let i = start; i < kinderen.length; i++) {
+    const kind = kinderen[i];
+    if (kind.naam !== "w:p") continue;
+    const tekst = alineaTekst(kind.xml).trim();
+    if (!tekst) continue;
+
+    const kop = !isBullet(kind.xml) && /^(\d{6})\s+(.+)$/.exec(tekst);
+    if (kop) {
+      if (huidig) entries.push(huidig);
+      if (entries.length >= max) return entries;
+      huidig = { datum: kop[1], kop: kop[2], blokken: [] };
+      continue;
+    }
+    if (!huidig) continue;
+    huidig.blokken.push({
+      soort: isBullet(kind.xml) ? "punt" : isVet(kind.xml) ? "kop" : "tekst",
+      tekst,
+    });
+  }
+  if (huidig) entries.push(huidig);
+  return entries.slice(0, max);
+}
+
 /** Vervangt de tekst van de eerste gevulde alinea (de documenttitel). */
 function zetTitel(xml, tekst) {
   const { kinderen } = bodyKinderen(xml);
@@ -307,6 +341,7 @@ module.exports = {
   voegEntryToe,
   zetHeaderWaarde,
   leegLogboek,
+  logboekEntries,
   zetTitel,
   alineaTekst,
   bodyKinderen,

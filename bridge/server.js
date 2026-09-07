@@ -23,7 +23,7 @@ const docx = require("./lib/docx");
 const { vraagClaude, vraagJson, zelftest, startwijze } = require("./lib/claude");
 const { vraagPrompt, voorstelPrompt, SCHEMA_VOORSTEL } = require("./lib/prompts");
 
-const VERSIE = "1.2.0";
+const VERSIE = "1.3.0";
 const MAX_BODY = 2 * 1024 * 1024;
 const CONFIG_PAD = process.env.PROJECTDOC_CONFIG || path.join(__dirname, "config.json");
 
@@ -250,14 +250,13 @@ async function afhandelen(req, res, url) {
     const p = zoekProject(url.searchParams.get("naam"));
     if (!p) return { fout: "Project niet gevonden" };
     const { xml } = docx.open(p.pad);
-    const tekst = docx.documentTekst(xml);
     return {
       naam: p.naam,
       bestand: p.bestand,
       map: p.map,
       gewijzigd: p.gewijzigd,
       header: docx.headerVelden(xml),
-      laatsteEntries: laatsteEntries(tekst, 3),
+      entries: docx.logboekEntries(xml),
     };
   }
 
@@ -356,19 +355,6 @@ async function afhandelen(req, res, url) {
   }
 
   return { fout: "Onbekend verzoek", status: 404 };
-}
-
-/** Kop + eerste zin van de laatste paar entries, voor de projectkaart in de app. */
-function laatsteEntries(tekst, aantal) {
-  const regels = tekst.split("\n");
-  const uit = [];
-  for (let i = 0; i < regels.length && uit.length < aantal; i++) {
-    const m = /^(\d{6})\s+(.+)$/.exec(regels[i].trim());
-    if (!m) continue;
-    const vervolg = (regels[i + 1] || "").trim();
-    uit.push({ datum: m[1], kop: m[2], eersteRegel: /^\d{6}\s/.test(vervolg) ? "" : vervolg });
-  }
-  return uit;
 }
 
 const server = http.createServer(async (req, res) => {
