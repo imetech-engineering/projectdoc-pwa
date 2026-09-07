@@ -57,20 +57,44 @@ function bekendePlekken() {
   ];
 }
 
-/** Het js-bestand waar een .cmd-shim naar wijst, als dat te vinden is. */
+/**
+ * Het js-bestand waar een .cmd-shim naar wijst.
+ *
+ * Zo'n shim van npm is een klein tekstbestand dat node aanroept met een pad
+ * naar het echte programma. Dat pad lezen we eruit: waar dat bestand precies
+ * staat verschilt per versie en per manier van installeren, dus zelf gokken
+ * werkt niet.
+ */
 function achterDeShim(cmdPad) {
   const map = path.dirname(cmdPad);
+  const bestaat = (p) => {
+    try {
+      return fs.statSync(p).isFile();
+    } catch (_) {
+      return false;
+    }
+  };
+
+  let inhoud = "";
+  try {
+    inhoud = fs.readFileSync(cmdPad, "utf8");
+  } catch (_) {}
+
+  // "%~dp0" en "%dp0%" staan voor de map waarin de shim zelf staat.
+  for (const treffer of inhoud.matchAll(/"?%[~]?dp0%?\\?([^"\s]+\.js)"?/gi)) {
+    const kandidaat = path.join(map, treffer[1].replace(/^[\\/]+/, ""));
+    if (bestaat(kandidaat)) return kandidaat;
+  }
+  for (const treffer of inhoud.matchAll(/"([A-Za-z]:\\[^"]+\.js)"/g)) {
+    if (bestaat(treffer[1])) return treffer[1];
+  }
+
+  // Valt er niets uit te lezen, dan de gebruikelijke indeling van npm.
   return (
     [
       path.join(map, "node_modules", "@anthropic-ai", "claude-code", "cli.js"),
       path.join(map, "..", "lib", "node_modules", "@anthropic-ai", "claude-code", "cli.js"),
-    ].find((p) => {
-      try {
-        return fs.statSync(p).isFile();
-      } catch (_) {
-        return false;
-      }
-    }) || null
+    ].find(bestaat) || null
   );
 }
 
@@ -162,18 +186,13 @@ function vraagClaude(prompt, opties = {}) {
     "--strict-mcp-config",
     "--disable-slash-commands",
   ];
-  if (schema) {
-    const schemaTekst = JSON.stringify(schema);
-    // Op de shell-route worden argumenten ongeschonden aan elkaar geplakt, dus
-    // knipt de opdrachtprompt het schema af bij de eerste spatie. Het schema
-    // hoort daarom spatievrij te zijn; deze controle houdt dat zo.
-    if (start.route === "cmd" && /\s/.test(schemaTekst)) {
-      return Promise.reject(
-        new Error("Het JSON-schema bevat spaties en overleeft de opdrachtprompt niet.")
-      );
-    }
-    args.push("--json-schema", schemaTekst);
+  // Via de opdrachtprompt overleeft een JSON-schema de reis niet: de
+  // aanhalingstekens sneuvelen onderweg. Dan zetten we het schema liever in de
+  // prompt; vraagJson vangt dat op.
+  if (schema && start.route === "cmd") {
+    return Promise.reject(new Error("json-schema kan niet via de opdrachtprompt"));
   }
+  if (schema) args.push("--json-schema", JSON.stringify(schema));
 
   return new Promise((resolve, reject) => {
     const begin = Date.now();
