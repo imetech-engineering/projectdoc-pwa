@@ -23,7 +23,7 @@ const docx = require("./lib/docx");
 const { vraagClaude, vraagJson, zelftest, startwijze } = require("./lib/claude");
 const { vraagPrompt, voorstelPrompt, SCHEMA_VOORSTEL } = require("./lib/prompts");
 
-const VERSIE = "1.0.0";
+const VERSIE = "1.1.0";
 const MAX_BODY = 2 * 1024 * 1024;
 const CONFIG_PAD = process.env.PROJECTDOC_CONFIG || path.join(__dirname, "config.json");
 

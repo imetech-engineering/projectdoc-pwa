@@ -19,6 +19,7 @@
     gesprek: [],
     bezig: false,
     dicteerDoel: null,
+    bridgeVersie: null,
   };
 
   /* ------------------------------------------------------------ hulpjes */
@@ -78,6 +79,14 @@
   /* ---------------------------------------------------------- projecten */
 
   async function laadProjecten(ververs) {
+    // Meteen ook de versie van de bridge ophalen: zo zie je in één oogopslag
+    // of beide helften bijgewerkt zijn.
+    Bridge.status()
+      .then((st) => {
+        state.bridgeVersie = st.versie;
+        toonVersies();
+      })
+      .catch(() => {});
     const data = await Bridge.projecten(ververs);
     state.projecten = data.projecten || [];
     vulSjabloonKeuze();
@@ -454,10 +463,19 @@
     $("spraak-hint").textContent = Spraak.luisterenKan()
       ? "Inspreken werkt het best in Chrome op Android."
       : "Deze browser kan niet naar spraak luisteren; typen kan altijd.";
-    $("versie-regel").textContent = `IMeTech Projectdoc ${window.PDOC_CONFIG?.versie || "?"}`;
+    toonVersies();
     $("over-tekst").textContent =
       "De app praat met Claude Code op je eigen pc. Er is geen API-sleutel en er zijn geen " +
       "losse API-kosten — het draait op je Claude-abonnement.";
+  }
+
+  function toonVersies() {
+    const regel = $("versie-regel");
+    if (!regel) return;
+    const app = window.PDOC_CONFIG?.versie || "?";
+    regel.textContent = state.bridgeVersie
+      ? `App ${app} · bridge ${state.bridgeVersie}`
+      : `App ${app} · bridge niet bereikt`;
   }
 
   function vulStemmen() {
@@ -508,11 +526,11 @@
     Bridge.stel($("cfg-url").value.trim(), $("cfg-token").value.trim());
     try {
       const st = await Bridge.status();
-      uitslag.textContent = `Verbonden. ${st.aantalProjecten} projecten gevonden, model ${st.model}. Nu Claude nog even proberen…`;
+      uitslag.textContent = `Verbonden met bridge ${st.versie}. ${st.aantalProjecten} projecten, model ${st.model}. Nu Claude nog even proberen…`;
       const test = await Bridge.zelftest();
       uitslag.textContent = test.ok
-        ? `Alles werkt. ${st.aantalProjecten} projecten gevonden, model ${st.model}.`
-        : `Bridge werkt, maar Claude reageerde niet zoals verwacht: ${test.melding}`;
+        ? `Alles werkt. Bridge ${st.versie}, ${st.aantalProjecten} projecten, model ${st.model}.`
+        : `Bridge ${st.versie} werkt, maar Claude reageerde niet zoals verwacht: ${test.melding}`;
       uitslag.classList.add(test.ok ? "goed" : "fout");
     } catch (e) {
       uitslag.textContent = e.message;
