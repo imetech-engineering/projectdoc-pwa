@@ -6,19 +6,48 @@
 
 function stijlregels(schrijver, initialen) {
   return `Je schrijft in de stijl van ${schrijver}, zoals in de bestaande logboeken:
-- Nederlands, kort en feitelijk. Geen opsmuk, geen marketingtaal, geen inleidende zinnen.
-- Derde persoon verleden tijd voor wat er gebeurd is; gebiedende wijs voor actiepunten.
-- Getallen (uren, bedragen, data, frequenties, typenummers) altijd letterlijk overnemen.
-- Verzin niets. Wat niet in de invoer staat, komt niet in de entry.
 
-Opbouw van een entry:
-- Kop: "JJMMDD Korte titel — kernresultaat". JJMMDD is de datum van de gebeurtenis (6 cijfers).
-- Daarna 1 tot 3 zinnen vrije tekst: wie, wat, waarom, uitkomst.
-- Daarna eventueel secties met een korte kop en opsommingspunten. Gebruikelijke koppen:
-  "Uitgevoerde werkzaamheden", "Niet uitgevoerd", "Afspraken", "Acties IM",
-  "Acties ${initialen}" (de schrijver zelf), "Acties <naam>". Bij een bezoek kan
-  een eerste alinea beginnen met "Aanwezig: ..." of "Tijdsduur: ...".
-- Alleen secties opnemen die er echt zijn. Liever geen sectie dan een lege.`;
+Toon
+- Nederlands, kort en feitelijk. Derde persoon verleden tijd voor wat er gebeurd is,
+  gebiedende wijs voor actiepunten. Geen opsmuk, geen inleidende zinnen, geen
+  samenvatting achteraf.
+- Alles wat concreet is blijft letterlijk staan: bedragen, uren, data, typenummers,
+  offertenummers, ticketnummers, meetwaarden, links en bestandsnamen. Liever te
+  precies dan te vlot.
+- Verzin niets. Wat niet in de notities staat, komt niet in de entry.
+
+Kop
+- "JJMMDD Korte aanduiding — kern van de uitkomst", waarbij JJMMDD de datum van de
+  gebeurtenis is. De aanduiding zegt wat het wás: een telefoongesprek, een mail, een
+  bezoek, een statuscheck, een analyse, een offerte, een bestelling.
+- Sommige oudere entries gebruiken "JJMMDD Soort – Onderwerp" zonder uitkomst. Volg
+  wat het document zelf doet, ook in de keuze van het streepje.
+
+Opbouw
+- Eén tot drie zinnen vrije tekst: wie, wat, waarom, uitkomst. Bij een bezoek mag de
+  eerste regel "Aanwezig: ..." of "Tijdsduur: ..." zijn.
+- Daarna secties met een eigen kop en opsommingspunten. De koppen zijn niet vast —
+  kies er een die zegt wat er in het blok staat. Veel gebruikt: "Aandachtspunten",
+  "Acties ${initialen}" (de schrijver zelf), "Acties <naam>", "Openstaande punten",
+  "Uitgevoerde werkzaamheden", "Afspraken", "Antwoorden op de vragen",
+  "Geplande aanpassing".
+- Een sectie mag ook zonder kop, als de punten direct op de tekst volgen. Laat de
+  kop dan leeg.
+- Een korte melding mag ook maar één regel zijn. Geen sectie is beter dan een lege.
+
+Aandachtspunten
+- Hier hoort wél een oordeel: wat het risico is, wat het betekent voor de planning of
+  de prijs, waar de zwakke plek zit. Kort en zakelijk, geen advies-taal.
+- Alleen opnemen als er echt iets te wegen valt.
+
+Verwijzingen
+- Naar een eerdere entry: "(zie logboek JJMMDD)".
+- Naar een bestand dat bij deze gebeurtenis hoort: de bestandsnaam tussen haakjes
+  aan het eind van het punt.
+
+Het bestaande document is altijd leidend. Neem de conventies over die je daar ziet:
+de streepjes, de scheidingstekens in de kopgegevens, de manier waarop datums en
+bedragen genoteerd worden, en hoe uitgebreid de entries zijn.`;
 }
 
 const SCHEMA_VOORSTEL = {
@@ -36,7 +65,7 @@ const SCHEMA_VOORSTEL = {
           items: {
             type: "object",
             properties: {
-              kop: { type: "string" },
+              kop: { type: "string", description: "Tussenkop; leeg laten als de punten direct op de tekst volgen." },
               punten: { type: "array", items: { type: "string" } },
             },
             required: ["kop", "punten"],
@@ -72,13 +101,27 @@ function vandaag() {
   const d = new Date();
   const p = (n) => String(n).padStart(2, "0");
   const kort = (x) => `${String(x.getFullYear()).slice(2)}${p(x.getMonth() + 1)}${p(x.getDate())}`;
-  const gisteren = new Date(d.getTime() - 86400000);
+  const terug = (n) => new Date(d.getTime() - n * 86400000);
+
+  // Een genoemde dag omrekenen naar een datum is precies het soort rekenwerk dat
+  // stilletjes fout gaat. Daarom rekenen we het hier uit en geeft de prompt een
+  // kant-en-klare tabel mee.
+  const regels = [
+    `vandaag, ${DAGEN[d.getDay()]} ${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} = ${kort(d)}`,
+    `gisteren, ${DAGEN[terug(1).getDay()]} = ${kort(terug(1))}`,
+    `eergisteren, ${DAGEN[terug(2).getDay()]} = ${kort(terug(2))}`,
+  ];
+  for (let n = 1; n <= 7; n++) {
+    const dag = terug(n);
+    if (n > 2) regels.push(`afgelopen ${DAGEN[dag.getDay()]} = ${kort(dag)}`);
+  }
+  regels.push(`een week geleden = ${kort(terug(7))}`);
+
   return {
     iso: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`,
     kort: kort(d),
     dag: DAGEN[d.getDay()],
-    gisterenKort: kort(gisteren),
-    gisterenDag: DAGEN[gisteren.getDay()],
+    datumtabel: regels.join("\n"),
   };
 }
 
@@ -113,7 +156,11 @@ ${vraag}
 function voorstelPrompt({ projectNaam, documentTekst, headerVelden, notities, historie, schrijver, initialen }) {
   const d = vandaag();
   const header = headerVelden.map((v) => `- ${v.label}: ${v.waarde}`).join("\n") || "(geen kop-tabel gevonden)";
-  return `Je maakt een logboek-entry voor het projectdocument "${projectNaam}". Vandaag is ${d.dag} ${d.iso} (JJMMDD: ${d.kort}); gisteren was ${d.gisterenDag} (JJMMDD: ${d.gisterenKort}).
+  return `Je maakt een logboek-entry voor het projectdocument "${projectNaam}". Vandaag is ${d.dag} ${d.iso} (JJMMDD: ${d.kort}).
+
+<datums>
+${d.datumtabel}
+</datums>
 
 ${stijlregels(schrijver, initialen)}
 
@@ -129,7 +176,7 @@ ${documentTekst}
 ${notities}
 </ruwe_notities>
 
-Notities worden vaak pas later ingesproken en noemen dan een dag in plaats van een datum ("gisteren", "afgelopen maandag", "vorige week donderdag"). Reken die om naar de echte datum en gebruik die in de kop. Staat er geen dag bij, dan is het vandaag.
+Notities worden vaak pas later ingesproken en noemen dan een dag in plaats van een datum ("gisteren", "afgelopen maandag"). Zoek die op in de tabel hierboven en gebruik die datum in de kop — reken niet zelf. Staat er helemaal geen dag bij, dan is het vandaag.
 
 De notities zijn van de schrijver zelf en komen vaak uit spraakherkenning: leestekens ontbreken, namen en vaktermen kunnen verhaspeld zijn. Corrigeer wat je met zekerheid uit de projectcontext kunt afleiden. Twijfel je over iets dat de betekenis verandert (een bedrag, een aantal uren, een toezegging, een naam), corrigeer het dan NIET maar zet er een korte vraag over in "vragen".
 
