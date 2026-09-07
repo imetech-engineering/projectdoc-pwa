@@ -148,6 +148,19 @@ main {
   -webkit-overflow-scrolling: touch;
 }
 .tab-panel { padding: 12px 12px calc(16px + var(--safe-bottom)); }
+
+/* De installeer-balk zweeft boven de inhoud; zolang hij er staat moet er
+   onderaan ruimte bij, anders is de laatste kaart niet te lezen. */
+body:has(#install-banner:not(.hidden)) .tab-panel {
+  padding-bottom: calc(150px + var(--safe-bottom));
+}
+
+.versie-regel {
+  margin: 0 0 10px;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  text-align: center;
+}
 #panel-vragen { display: flex; flex-direction: column; height: 100%; padding: 0; }
 
 .card {

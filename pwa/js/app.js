@@ -454,9 +454,10 @@
     $("spraak-hint").textContent = Spraak.luisterenKan()
       ? "Inspreken werkt het best in Chrome op Android."
       : "Deze browser kan niet naar spraak luisteren; typen kan altijd.";
+    $("versie-regel").textContent = `IMeTech Projectdoc ${window.PDOC_CONFIG?.versie || "?"}`;
     $("over-tekst").textContent =
-      `Versie ${window.PDOC_CONFIG?.versie || "?"}. De app praat met Claude Code op je eigen pc. ` +
-      "Er is geen API-sleutel en er zijn geen losse API-kosten — het draait op je Claude-abonnement.";
+      "De app praat met Claude Code op je eigen pc. Er is geen API-sleutel en er zijn geen " +
+      "losse API-kosten — het draait op je Claude-abonnement.";
   }
 
   function vulStemmen() {
@@ -676,6 +677,7 @@
       Opslag.zetInstellingen({ stem: $("cfg-stem").value });
       Spraak.spreek("Zo klink ik.", $("cfg-stem").value);
     });
+    $("btn-update").addEventListener("click", zoekNieuweVersie);
     $("btn-wis-lokaal").addEventListener("click", () => {
       if (!confirm("Alle lokale instellingen, concepten en gesprekken wissen?")) return;
       Opslag.wisAlles();
@@ -687,6 +689,22 @@
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) Spraak.stop();
     });
+  }
+
+  /** Zelf naar een nieuwe versie zoeken, voor als het wachten te lang duurt. */
+  async function zoekNieuweVersie() {
+    if (!("serviceWorker" in navigator)) return toast("Deze browser werkt niet met versiebeheer.");
+    toast("Zoeken naar een nieuwe versie…");
+    try {
+      const registratie = await navigator.serviceWorker.getRegistration();
+      if (!registratie) return toast("Nog geen versiebeheer actief; herlaad de pagina.");
+      await registratie.update();
+      // Is er iets nieuws, dan neemt dat het zo over en herlaadt de app zichzelf.
+      if (registratie.installing || registratie.waiting) toast("Nieuwe versie gevonden — even opnieuw laden.");
+      else toast(`Je hebt de nieuwste versie (${window.PDOC_CONFIG?.versie || "?"}).`);
+    } catch (_) {
+      toast("Kon niet naar een nieuwe versie zoeken.", true);
+    }
   }
 
   function registreerServiceWorker() {

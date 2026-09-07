@@ -1,4 +1,4 @@
-const CACHE = "imtech-projectdoc-v5";
+const CACHE = "imtech-projectdoc-v6";
 const ASSETS = [
   "./",
   "./index.html",
@@ -18,7 +18,13 @@ const ASSETS = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches
+      .open(CACHE)
+      // "reload" omzeilt de gewone browsercache. Zonder dat kan een nieuwe
+      // versie zichzelf vullen met de oude bestanden die daar nog liggen, en
+      // dan meldt de app een nieuwe versie terwijl er niets verandert.
+      .then((cache) => cache.addAll(ASSETS.map((u) => new Request(u, { cache: "reload" }))))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -38,7 +44,10 @@ self.addEventListener("activate", (event) => {
 async function uitCacheEnBijwerken(request) {
   const cache = await caches.open(CACHE);
   const opgeslagen = await cache.match(request);
-  const netwerk = fetch(request)
+  // Ook hier langs de browsercache heen: anders ververst de app zichzelf met
+  // een kopie die net zo oud is als wat er al lag.
+  const versVerzoek = request.mode === "navigate" ? request : new Request(request.url, { cache: "no-cache" });
+  const netwerk = fetch(versVerzoek)
     .then((res) => {
       if (res && res.ok) cache.put(request, res.clone());
       return res;
