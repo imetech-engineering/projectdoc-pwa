@@ -162,6 +162,8 @@ function vraagPrompt({ projectNaam, documentTekst, vraag, historie, mail }) {
 
 Hieronder staat de volledige inhoud van het projectdocument "${projectNaam}", en soms recente mail uit het eigen postvak die bij het project hoort. Beantwoord de vraag daarop. Weet je het uit geen van beide, zeg dat dan gewoon. Komt het antwoord uit een mailbericht en niet uit het logboek, zeg er dan bij dat het uit de mail komt.
 
+Vraagt hij of iets al verwerkt is, of wat er nog open staat, leg de mail dan naast het logboek: noem per bericht of het al in een entry terugkomt en zo ja in welke, en welke berichten nog nergens genoemd worden. Ga daarbij op de inhoud af, niet op de datum alleen — een bericht kan in een entry van een andere dag verwerkt zijn.
+
 Antwoord in het Nederlands, kort en direct — dit wordt op een telefoon gelezen en soms hardop voorgelezen. Geen opsommingen tenzij het echt een lijstje is. Noem waar relevant de datum van de logboek-entry waar het antwoord vandaan komt.
 
 <projectdocument naam="${projectNaam}">

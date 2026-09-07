@@ -25,7 +25,7 @@ const mailZoeker = require("./lib/mail");
 const { gekoppeld: mailGekoppeld } = require("./lib/graph");
 const { vraagPrompt, voorstelPrompt, SCHEMA_VOORSTEL } = require("./lib/prompts");
 
-const VERSIE = "1.6.0";
+const VERSIE = "1.7.0";
 const MAX_BODY = 2 * 1024 * 1024;
 const CONFIG_PAD = process.env.PROJECTDOC_CONFIG || path.join(__dirname, "config.json");
 
