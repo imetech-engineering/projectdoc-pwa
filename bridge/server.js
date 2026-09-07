@@ -403,8 +403,9 @@ const server = http.createServer(async (req, res) => {
 
 server.on("error", (e) => {
   if (e.code === "EADDRINUSE") {
-    console.error(`Poort ${config.poort} is al bezet — draait de bridge ergens anders al?`);
-    process.exit(1);
+    console.error(`Poort ${config.poort} is al bezet — er draait nog een bridge.`);
+    console.error("Sluit die eerst af; opnieuw starten heeft tot die tijd geen zin.");
+    process.exit(3);
   }
   throw e;
 });

@@ -100,6 +100,16 @@ Dat maakt een geplande taak die bij het inloggen begint en zonder venster
 draait; wat de bridge te melden heeft komt in `bridge.log`. Beheerdersrechten
 zijn niet nodig. Weghalen kan met `.\uninstall-autostart.ps1`.
 
+Na een `git pull` herstart je de bridge met:
+
+```
+powershell -ExecutionPolicy Bypass -File .\herstart.ps1
+```
+
+Dat stopt de taak, ruimt achtergebleven node-processen op — die houden anders
+de poort bezet waardoor de nieuwe versie niet start — en laat daarna de laatste
+regels van `bridge.log` zien, inclusief de versie en de gevonden projecten.
+
 Waarom bij het inloggen en niet bij het opstarten: Claude Code gebruikt de
 inloggegevens uit je gebruikersprofiel, en daar kan een dienst zonder
 aangemeld account niet bij. Logt je pc automatisch in na een herstart, dan komt
