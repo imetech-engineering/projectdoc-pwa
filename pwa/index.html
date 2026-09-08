@@ -43,6 +43,7 @@
       <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
       <path d="M8 21v-7h8v7" /><path d="M8 3v5h6" />
     </symbol>
+    <symbol id="ic-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></symbol>
     <symbol id="ic-vernieuwen" viewBox="0 0 24 24">
       <path d="M4 12a8 8 0 0 1 13.7-5.7L20 8" /><path d="M20 3v5h-5" />
       <path d="M20 12a8 8 0 0 1-13.7 5.7L4 16" /><path d="M4 21v-5h5" />
@@ -145,6 +146,7 @@
       <section id="panel-vragen" class="tab-panel hidden">
         <div id="gesprek" class="gesprek"></div>
         <div class="vraag-balk">
+          <button type="button" id="btn-gesprek-wis" class="btn-rond" aria-label="Gesprek wissen" title="Gesprek wissen"><svg class="ic" aria-hidden="true"><use href="#ic-prullenbak"></use></svg></button>
           <button type="button" id="btn-dicteer-vraag" class="btn-rond" aria-pressed="false" aria-label="Inspreken" title="Inspreken"><svg class="ic" aria-hidden="true"><use href="#ic-mic"></use></svg></button>
           <input id="vraag-tekst" type="text" placeholder="Stel een vraag over dit project" enterkeyhint="send" />
           <button type="button" id="btn-vraag" class="btn-primary btn-rond-primair" aria-label="Vraag versturen" title="Versturen"><svg class="ic" aria-hidden="true"><use href="#ic-versturen"></use></svg></button>
@@ -246,7 +248,10 @@
       </div>
     </div>
 
-    <div id="toast" class="toast hidden" role="status"></div>
+    <div id="toast" class="toast hidden" role="status">
+      <span id="toast-tekst"></span>
+      <button type="button" id="toast-actie" class="toast-actie hidden"></button>
+    </div>
 
     <script src="config.js"></script>
     <script src="js/opslag.js"></script>

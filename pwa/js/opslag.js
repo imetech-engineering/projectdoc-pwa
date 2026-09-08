@@ -63,8 +63,17 @@
     zetVoorstel: (project, v) =>
       v ? schrijf("voorstel_" + sleutelVan(project), v) : verwijder("voorstel_" + sleutelVan(project)),
 
+    // Welk voorstel je hebt weggegooid of opgeslagen. De bridge bewaart zijn
+    // kopie een half uur; hiermee weet de app dat die niet meer hoeft.
+    afgehandeldVoorstel: (project) => lees("voorstelweg_" + sleutelVan(project), null),
+    zetAfgehandeldVoorstel: (project, id) =>
+      id
+        ? schrijf("voorstelweg_" + sleutelVan(project), id)
+        : verwijder("voorstelweg_" + sleutelVan(project)),
+
     gesprek: (project) => lees("gesprek_" + sleutelVan(project), []),
     zetGesprek: (project, beurten) => schrijf("gesprek_" + sleutelVan(project), beurten.slice(-20)),
+    wisGesprek: (project) => verwijder("gesprek_" + sleutelVan(project)),
 
     wisAlles() {
       try {

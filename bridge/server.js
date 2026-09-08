@@ -25,7 +25,7 @@ const mailZoeker = require("./lib/mail");
 const { gekoppeld: mailGekoppeld } = require("./lib/graph");
 const { vraagPrompt, voorstelPrompt, SCHEMA_VOORSTEL } = require("./lib/prompts");
 
-const VERSIE = "1.9.0";
+const VERSIE = "1.10.0";
 const MAX_BODY = 2 * 1024 * 1024;
 const CONFIG_PAD = process.env.PROJECTDOC_CONFIG || path.join(__dirname, "config.json");
 
@@ -159,6 +159,17 @@ function bewaarVoorstel(naam, gegevens) {
   for (const [sleutel, waarde] of voorstellen) {
     if (Date.now() - waarde.tijd > VOORSTEL_BEWAARTIJD) voorstellen.delete(sleutel);
   }
+}
+
+/**
+ * Wat hier klaarstond is in de app afgehandeld — weggegooid of opgeslagen — en
+ * mag dus niet nog eens teruggegeven worden. Is de pc intussen aan een volgend
+ * voorstel begonnen, dan blijft dat wachtsein wél staan: dat werk is nieuw.
+ */
+function vergeetVoorstel(naam) {
+  const bewaard = voorstellen.get(naam);
+  if (bewaard && bewaard.bezig) voorstellen.set(naam, { bezig: true, tijd: bewaard.tijd });
+  else voorstellen.delete(naam);
 }
 
 /* ---------------------------------------------------------------- backups */
@@ -339,8 +350,18 @@ async function afhandelen(req, res, url) {
       bezig: !!bewaard.bezig,
       resultaat: bewaard.resultaat || null,
       foutmelding: bewaard.foutmelding || null,
+      // Waaraan de app herkent of ze dit voorstel al gehad heeft.
+      voorstelId: bewaard.voorstelId || null,
       ouderdomMs: Date.now() - bewaard.tijd,
     };
+  }
+
+  if (pad === "/api/voorstel-weg" && req.method === "POST") {
+    const body = await leesBody(req);
+    const p = zoekProject(body.project);
+    if (!p) return { fout: "Project niet gevonden" };
+    vergeetVoorstel(p.naam);
+    return { ok: true };
   }
 
   if (pad === "/api/voorstel" && req.method === "POST") {
@@ -369,18 +390,20 @@ async function afhandelen(req, res, url) {
         claudeOpties
       ));
     } catch (e) {
-      bewaarVoorstel(p.naam, { bezig: false, foutmelding: e.message });
+      bewaarVoorstel(p.naam, { bezig: false, foutmelding: e.message, voorstelId: crypto.randomUUID() });
       throw e;
     }
+    const voorstelId = crypto.randomUUID();
     const resultaat = {
       ...data,
       project: p.naam,
       bestand: p.bestand,
+      voorstelId,
       duurMs,
       mailGebruikt: mail.berichten.map(kortMail),
       mailMelding: mail.melding,
     };
-    bewaarVoorstel(p.naam, { bezig: false, resultaat });
+    bewaarVoorstel(p.naam, { bezig: false, resultaat, voorstelId });
     return resultaat;
   }
 

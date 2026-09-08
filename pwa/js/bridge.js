@@ -64,6 +64,7 @@
     voorstel: (body) => roep("/api/voorstel", { body }),
     laatsteVoorstel: (naam) =>
       roep("/api/voorstel-laatst?naam=" + encodeURIComponent(naam), { timeoutMs: 15000 }),
+    voorstelWeg: (project) => roep("/api/voorstel-weg", { body: { project }, timeoutMs: 15000 }),
     opslaan: (body) => roep("/api/opslaan", { body, timeoutMs: 60000 }),
     nieuwProject: (body) => roep("/api/nieuwproject", { body, timeoutMs: 60000 }),
   };

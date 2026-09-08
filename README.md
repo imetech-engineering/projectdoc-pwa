@@ -42,6 +42,10 @@ zegt het als hij ergens over twijfelt — die vragen kun je beantwoorden en het
 voorstel opnieuw laten maken. Pas als je op **Opslaan** drukt gaat er iets naar
 het document.
 
+Onder het invoerveld staat het logboek zelf, ingeklapt: je ziet de datum en de
+kop van elke entry, en tikken vouwt er precies één open. Het voorstel waar je
+op dat moment aan werkt staat er los boven en blijft wél open staan.
+
 **Vragen.** Stel vragen over het project ("wat staat er nog open?", "wat was er
 afgesproken over de levertijd?"). Antwoorden komen alleen uit het
 projectdocument zelf, met vermelding van de entry waar ze vandaan komen. Laat

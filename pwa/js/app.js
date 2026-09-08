@@ -18,6 +18,7 @@
     voorstel: null,
     headerAan: [],
     gesprek: [],
+    openEntry: null,
     bezig: false,
     dicteerDoel: null,
     bridgeVersie: null,
@@ -28,13 +29,27 @@
   /* ------------------------------------------------------------ hulpjes */
 
   let toastKlok = null;
-  function toast(tekst, isFout) {
+  /**
+   * Een kort bericht onderin. Met `actie` ({ label, doe }) komt er een knop bij
+   * te staan; die krijgt wat langer de tijd, want er moet nog op gedrukt worden.
+   */
+  function toast(tekst, isFout, actie) {
     const el = $("toast");
-    el.textContent = tekst;
+    const knop = $("toast-actie");
+    $("toast-tekst").textContent = tekst;
+    knop.textContent = actie ? actie.label : "";
+    knop.classList.toggle("hidden", !actie);
+    knop.onclick = actie
+      ? () => {
+          clearTimeout(toastKlok);
+          el.classList.add("hidden");
+          actie.doe();
+        }
+      : null;
     el.classList.toggle("fout", !!isFout);
     el.classList.remove("hidden");
     clearTimeout(toastKlok);
-    toastKlok = setTimeout(() => el.classList.add("hidden"), isFout ? 6000 : 3200);
+    toastKlok = setTimeout(() => el.classList.add("hidden"), actie ? 7000 : isFout ? 6000 : 3200);
   }
 
   function zetStatus(tekst, soort) {
@@ -159,7 +174,10 @@
     state.voorstel = null;
     Opslag.zetLaatsteProject(naam);
     $("project-naam").textContent = naam || "Kies een project";
-    verbergVoorstel();
+    state.openEntry = null;
+    // Alleen de kaart opruimen: het voorstel dat bij dít project bewaard is
+    // moet blijven staan, dat lezen we hieronder juist terug.
+    sluitVoorstelKaart();
     $("opslag-bevestiging").classList.add("hidden");
 
     const concept = Opslag.concept(naam);
@@ -221,8 +239,12 @@
       state.wachtOpPc = false;
       bezig(false);
     }
+    // Weggegooid of al opgeslagen: de bridge houdt zijn kopie een half uur
+    // vast, en die hoort niet opnieuw in beeld te komen.
+    if (uit.voorstelId && uit.voorstelId === Opslag.afgehandeldVoorstel(state.project)) return;
     if (uit.foutmelding && !state.voorstel) {
       toast(uit.foutmelding, true);
+      vergeetVoorstel(state.project, uit.voorstelId);
       return;
     }
     // Staat er al een voorstel in beeld, dan blijft dat staan: dat is waar je
@@ -267,10 +289,33 @@
       return;
     }
     el.innerHTML = state.entries.map(entryHtml).join("");
+    el.querySelectorAll("details.logboek-entry").forEach((blok) =>
+      blok.addEventListener("toggle", () => vouwEntry(el, blok))
+    );
   }
 
+  /**
+   * Eén entry tegelijk open: een logboek van dertig entries is anders een lap
+   * tekst waarin je alleen nog kunt scrollen.
+   */
+  function vouwEntry(lijst, blok) {
+    if (!blok.open) {
+      if (state.openEntry === blok.dataset.sleutel) state.openEntry = null;
+      return;
+    }
+    state.openEntry = blok.dataset.sleutel;
+    lijst.querySelectorAll("details.logboek-entry[open]").forEach((ander) => {
+      if (ander !== blok) ander.open = false;
+    });
+    // Sluit er iets boven je dicht, dan schuift deze entry mee omhoog; even
+    // terugbrengen in beeld scheelt zoeken.
+    blok.scrollIntoView({ block: "nearest" });
+  }
+
+  const entrySleutel = (entry) => `${entry.datum}|${entry.kop}`;
+
   function entryHtml(entry) {
-    const delen = [`<h3><span class="datum">${esc(entry.datum)}</span> ${esc(entry.kop)}</h3>`];
+    const delen = [];
     let punten = [];
     const spoelPunten = () => {
       if (!punten.length) return;
@@ -290,7 +335,13 @@
       );
     }
     spoelPunten();
-    return `<article class="logboek-entry">${delen.join("")}</article>`;
+    const sleutel = entrySleutel(entry);
+    return (
+      `<details class="logboek-entry" data-sleutel="${esc(sleutel)}"${state.openEntry === sleutel ? " open" : ""}>` +
+      `<summary><span class="datum">${esc(entry.datum)}</span><span class="entry-kop">${esc(entry.kop)}</span>` +
+      `<svg class="ic entry-chevron" aria-hidden="true"><use href="#ic-chevron"></use></svg></summary>` +
+      `<div class="entry-inhoud">${delen.join("")}</div></details>`
+    );
   }
 
   const esc = (s) =>
@@ -311,11 +362,36 @@
     conceptKlok = setTimeout(() => Opslag.zetConcept(state.project, $("notities").value), 400);
   }
 
-  function verbergVoorstel() {
-    state.voorstel = null;
-    Opslag.zetVoorstel(state.project, null);
+  /** Alleen de kaart uit beeld halen; het voorstel zelf blijft bewaard. */
+  function sluitVoorstelKaart() {
     $("voorstel-kaart").classList.add("hidden");
     $("voorstel-bijsturen").value = "";
+    $("voorstel-vragen-lijst").innerHTML = "";
+  }
+
+  /**
+   * Een voorstel waar je klaar mee bent: hier weg, en ook op de pc.
+   *
+   * De bridge houdt het laatste voorstel een half uur vast, zodat de app het
+   * kan ophalen als de telefoon tussendoor is afgesloten. Zonder dit seintje
+   * zet hij precies dat voorstel bij de volgende keer openen weer terug — ook
+   * het voorstel dat je net had weggegooid of al had opgeslagen.
+   */
+  function vergeetVoorstel(project, voorstelId) {
+    if (!project) return;
+    Opslag.zetVoorstel(project, null);
+    // Is de pc even niet bereikbaar, dan mag het alsnog niet terugkomen;
+    // daarom onthouden we hier ook welk voorstel je gehad hebt.
+    if (voorstelId) Opslag.zetAfgehandeldVoorstel(project, voorstelId);
+    Bridge.voorstelWeg(project).catch(() => {});
+  }
+
+  function gooiVoorstelWeg() {
+    const project = state.project;
+    const id = state.voorstel?.voorstelId;
+    state.voorstel = null;
+    sluitVoorstelKaart();
+    vergeetVoorstel(project, id);
   }
 
   /** Het voorstel als tekst — dat sturen we mee als je iets wilt bijsturen. */
@@ -467,7 +543,7 @@
         entry: v.entry,
         headerWijzigingen: wijzigingen,
       });
-      verbergVoorstel();
+      gooiVoorstelWeg();
       $("notities").value = "";
       pasHoogteAan();
       Opslag.zetConcept(state.project, "");
@@ -930,10 +1006,24 @@
       veld.focus();
     });
     $("btn-notities-wis").addEventListener("click", () => {
-      $("notities").value = "";
+      const veld = $("notities");
+      const vorige = veld.value;
+      if (!vorige) return;
+      const project = state.project;
+      veld.value = "";
       pasHoogteAan();
-      Opslag.zetConcept(state.project, "");
+      Opslag.zetConcept(project, "");
       $("concept-hint").classList.add("hidden");
+      // Een misgetikte prullenbak kost anders een heel ingesproken verhaal.
+      toast("Notities gewist.", false, {
+        label: "Ongedaan maken",
+        doe() {
+          if (state.project !== project) return toast("Die notities horen bij een ander project.", true);
+          veld.value = vorige;
+          pasHoogteAan();
+          Opslag.zetConcept(project, vorige);
+        },
+      });
     });
     $("btn-dicteer").addEventListener("click", () => dicteerNaar("notities", $("btn-dicteer")));
     $("btn-dicteer-bijsturen").addEventListener("click", () =>
@@ -950,9 +1040,18 @@
       maakVoorstel(bij);
     });
     $("btn-opslaan").addEventListener("click", slaVoorstelOp);
-    $("btn-voorstel-weg").addEventListener("click", verbergVoorstel);
+    $("btn-voorstel-weg").addEventListener("click", gooiVoorstelWeg);
 
     $("btn-vraag").addEventListener("click", stelVraag);
+    $("btn-gesprek-wis").addEventListener("click", () => {
+      if (!state.project) return toast("Kies eerst een project.");
+      if (!state.gesprek.length) return toast("Er is nog geen gesprek om te wissen.");
+      if (!confirm("Het gesprek over dit project wissen?")) return;
+      state.gesprek = [];
+      Opslag.wisGesprek(state.project);
+      tekenGesprek();
+      toast("Gesprek gewist.");
+    });
     $("vraag-tekst").addEventListener("keydown", (e) => {
       if (e.key === "Enter") stelVraag();
     });
