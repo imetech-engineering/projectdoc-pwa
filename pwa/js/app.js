@@ -109,6 +109,7 @@
 
   /* ---------------------------------------------------------- projecten */
 
+  let oudeBridgeGemeld = false;
   async function laadProjecten(ververs) {
     // Meteen ook de versie van de bridge ophalen: zo zie je in één oogopslag
     // of beide helften bijgewerkt zijn.
@@ -118,6 +119,10 @@
         state.claudeInfo = st.claude;
         toonVersies();
         toonMailStatus(st.mail);
+        if (bridgeLooptAchter() && !oudeBridgeGemeld) {
+          oudeBridgeGemeld = true;
+          toast(`De bridge op je pc is versie ${st.versie} — herstart hem even, de app verwacht ${window.PDOC_CONFIG.minimaleBridge}.`, true);
+        }
       })
       .catch(() => {});
     const data = await Bridge.projecten(ververs);
@@ -241,12 +246,15 @@
     }
     // Weggegooid of al opgeslagen: de bridge houdt zijn kopie een half uur
     // vast, en die hoort niet opnieuw in beeld te komen.
-    if (uit.voorstelId && uit.voorstelId === Opslag.afgehandeldVoorstel(state.project)) return;
+    const afgehandeld = Opslag.afgehandeldVoorstel(state.project);
     if (uit.foutmelding && !state.voorstel) {
+      const kenmerk = uit.voorstelId || "fout:" + vingerafdruk(uit.foutmelding);
+      if (kenmerk === afgehandeld) return;
       toast(uit.foutmelding, true);
-      vergeetVoorstel(state.project, uit.voorstelId);
+      vergeetVoorstel(state.project, kenmerk);
       return;
     }
+    if (uit.resultaat && voorstelKenmerk(uit.resultaat) === afgehandeld) return;
     // Staat er al een voorstel in beeld, dan blijft dat staan: dat is waar je
     // net naar zat te kijken.
     if (!uit.resultaat || state.voorstel) return;
@@ -377,21 +385,47 @@
    * zet hij precies dat voorstel bij de volgende keer openen weer terug — ook
    * het voorstel dat je net had weggegooid of al had opgeslagen.
    */
-  function vergeetVoorstel(project, voorstelId) {
+  function vergeetVoorstel(project, kenmerk) {
     if (!project) return;
     Opslag.zetVoorstel(project, null);
-    // Is de pc even niet bereikbaar, dan mag het alsnog niet terugkomen;
-    // daarom onthouden we hier ook welk voorstel je gehad hebt.
-    if (voorstelId) Opslag.zetAfgehandeldVoorstel(project, voorstelId);
+    // Ook zonder bereikbare pc mag het niet terugkomen; daarom onthouden we
+    // hier welk voorstel je gehad hebt.
+    if (kenmerk) Opslag.zetAfgehandeldVoorstel(project, kenmerk);
     Bridge.voorstelWeg(project).catch(() => {});
   }
 
   function gooiVoorstelWeg() {
     const project = state.project;
-    const id = state.voorstel?.voorstelId;
+    const kenmerk = voorstelKenmerk(state.voorstel);
     state.voorstel = null;
     sluitVoorstelKaart();
-    vergeetVoorstel(project, id);
+    vergeetVoorstel(project, kenmerk);
+  }
+
+  /**
+   * Waaraan de app een voorstel herkent dat ze al gehad heeft.
+   *
+   * Het liefst aan het kenmerk van de bridge, maar dat geeft alleen een bridge
+   * van 1.10.0 of nieuwer mee. Draait er op de pc nog een oudere, dan zou dat
+   * het vangnet stilzwijgend uitschakelen — en komt een weggegooid voorstel
+   * alsnog terug. Vandaar de terugval op de inhoud zelf: die heeft elk
+   * voorstel, van welke bridge dan ook.
+   */
+  function voorstelKenmerk(v) {
+    if (!v) return null;
+    if (v.voorstelId) return v.voorstelId;
+    if (!v.entry?.kop) return null;
+    return "inhoud:" + vingerafdruk(voorstelAlsTekst(v));
+  }
+
+  /** Korte, stabiele afdruk van een stuk tekst (FNV-1a). */
+  function vingerafdruk(tekst) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < tekst.length; i++) {
+      h ^= tekst.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return (h >>> 0).toString(16);
   }
 
   /** Het voorstel als tekst — dat sturen we mee als je iets wilt bijsturen. */
@@ -420,6 +454,8 @@
     try {
       const v = await Bridge.voorstel({ project: state.project, notities, historie });
       state.voorstel = v;
+      // Vraag je hetzelfde voorstel bewust opnieuw aan, dan wil je het zien.
+      Opslag.zetAfgehandeldVoorstel(state.project, null);
       Opslag.zetVoorstel(state.project, v);
       state.headerAan = (v.headerWijzigingen || []).map(() => true);
       tekenVoorstel();
@@ -710,6 +746,7 @@
     const regel = $("versie-regel");
     if (!regel) return;
     const app = window.PDOC_CONFIG?.versie || "?";
+    regel.classList.remove("fout");
     if (!state.bridgeVersie) {
       regel.textContent = `App ${app} · bridge niet bereikt`;
       return;
@@ -720,7 +757,28 @@
       : state.claudeInfo
         ? " · Claude niet gevonden"
         : "";
-    regel.textContent = `App ${app} · bridge ${state.bridgeVersie}${claude}`;
+    const oud = bridgeLooptAchter();
+    regel.classList.toggle("fout", oud);
+    regel.textContent =
+      `App ${app} · bridge ${state.bridgeVersie}${claude}` +
+      (oud ? ` — verouderd, herstart de bridge op je pc (${window.PDOC_CONFIG.minimaleBridge} of nieuwer)` : "");
+  }
+
+  /**
+   * Een bridge die achterloopt mist routes die de app gebruikt, en dat merk je
+   * niet vanzelf: zo'n verzoek mislukt stilletjes. Daarom zeggen we het.
+   */
+  function bridgeLooptAchter() {
+    const minimaal = window.PDOC_CONFIG?.minimaleBridge;
+    if (!minimaal || !state.bridgeVersie) return false;
+    const heeft = String(state.bridgeVersie).split(".").map(Number);
+    const nodig = String(minimaal).split(".").map(Number);
+    for (let i = 0; i < nodig.length; i++) {
+      const a = heeft[i] || 0;
+      const b = nodig[i] || 0;
+      if (a !== b) return a < b;
+    }
+    return false;
   }
 
   function vulStemmen() {

@@ -176,6 +176,7 @@ body:has(#install-banner:not(.hidden)) .tab-panel {
   color: var(--text-tertiary);
   text-align: center;
 }
+.versie-regel.fout { color: var(--danger); }
 #panel-vragen { display: flex; flex-direction: column; height: 100%; padding: 0; }
 
 /* ------------------------------------------------------------- loggen */
