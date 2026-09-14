@@ -25,7 +25,10 @@ const mailZoeker = require("./lib/mail");
 const { gekoppeld: mailGekoppeld } = require("./lib/graph");
 const { vraagPrompt, voorstelPrompt, SCHEMA_VOORSTEL } = require("./lib/prompts");
 
-const VERSIE = "1.10.0";
+// Eén plek waar het versienummer staat: package.json. Stond het ook hier, dan
+// lopen die twee vroeg of laat uiteen en kijk je bij het zoeken naar de
+// draaiende versie naar het verkeerde getal.
+const VERSIE = require("./package.json").version;
 const MAX_BODY = 2 * 1024 * 1024;
 const CONFIG_PAD = process.env.PROJECTDOC_CONFIG || path.join(__dirname, "config.json");
 
