@@ -16,6 +16,7 @@
     projectInfo: null,
     entries: [],
     voorstel: null,
+    verzonden: "",
     headerAan: [],
     gesprek: [],
     openEntry: null,
@@ -83,6 +84,39 @@
     try {
       navigator.vibrate(patroon);
     } catch (_) {}
+  }
+
+  /* -------------------------------------------------------- toetsenbord */
+
+  /**
+   * Hoeveel het schermtoetsenbord van beeld afsnoept, als CSS-waarde --kb.
+   *
+   * Een toetsenbord verkleint wel het zichtbare venster, maar niet de pagina.
+   * Alles wat onderaan hoort — de invoerbalk, de projectkiezer, een toast —
+   * blijft daardoor op zijn plek en verdwijnt erachter: je typt in het zoekveld
+   * en ziet de lijst niet meer die je aan het uitdunnen bent. Door de hoogte
+   * zelf te meten kan de opmaak eromheen rekenen.
+   */
+  function volgToetsenbord() {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    let vorige = -1;
+    const meet = () => {
+      // Een paar tientallen pixels is de adresbalk die in- of uitschuift; daar
+      // hoort de hele app niet van op te springen.
+      const ruw = window.innerHeight - vv.height - vv.offsetTop;
+      const kb = ruw > 80 ? Math.round(ruw) : 0;
+      if (kb === vorige) return;
+      vorige = kb;
+      document.documentElement.style.setProperty("--kb", kb + "px");
+      pasHoogteAan();
+      // iOS schuift de pagina zelf omhoog om het veld vrij te houden. Dat hoeft
+      // niet meer nu de app zelf krimpt, en het duwt de kop uit beeld.
+      if (kb) window.scrollTo(0, 0);
+    };
+    vv.addEventListener("resize", meet);
+    vv.addEventListener("scroll", meet);
+    meet();
   }
 
   /* -------------------------------------------------------------- thema */
@@ -191,6 +225,8 @@
     $("concept-hint").classList.toggle("hidden", !concept);
     if (concept) $("concept-hint").textContent = "Onopgeslagen notities van eerder teruggezet.";
 
+    state.verzonden = Opslag.verzonden(naam);
+
     state.gesprek = Opslag.gesprek(naam);
     tekenGesprek();
     state.entries = [];
@@ -200,6 +236,10 @@
     if (state.voorstel) {
       state.headerAan = (state.voorstel.headerWijzigingen || []).map(() => true);
       tekenVoorstel();
+    } else {
+      // Geparkeerde notities zonder voorstel erbij zijn ergens blijven hangen;
+      // die horen weer gewoon in het invoerveld te staan.
+      herstelNotities();
     }
 
     try {
@@ -261,6 +301,10 @@
     state.voorstel = uit.resultaat;
     state.headerAan = (uit.resultaat.headerWijzigingen || []).map(() => true);
     Opslag.zetVoorstel(state.project, uit.resultaat);
+    // De app kan afgesloten zijn geweest voordat ze de notities kon opbergen;
+    // bij een voorstel hoort een leeg invoerveld.
+    const achtergebleven = $("notities").value.trim();
+    if (achtergebleven) parkeerNotities(achtergebleven);
     tekenVoorstel();
     toast("Voorstel opgehaald dat je pc had klaargezet.");
   }
@@ -360,14 +404,55 @@
   /** Het invoerveld groeit mee met de tekst, tot de ingestelde maximumhoogte. */
   function pasHoogteAan() {
     const veld = $("notities");
+    // Met het toetsenbord open is er veel minder scherm; meegroeien tot een
+    // deel van de hele hoogte zou het veld achter het toetsenbord duwen.
+    const zichtbaar = window.visualViewport?.height || window.innerHeight;
     veld.style.height = "auto";
-    veld.style.height = Math.min(veld.scrollHeight, window.innerHeight * (veld.classList.contains("groot") ? 0.55 : 0.28)) + "px";
+    veld.style.height = Math.min(veld.scrollHeight, zichtbaar * (veld.classList.contains("groot") ? 0.55 : 0.28)) + "px";
   }
 
   let conceptKlok = null;
   function bewaarConcept() {
     clearTimeout(conceptKlok);
     conceptKlok = setTimeout(() => Opslag.zetConcept(state.project, $("notities").value), 400);
+  }
+
+  /**
+   * De notities opbergen zodra er een voorstel van gemaakt is.
+   *
+   * Ze zijn verstuurd, dus het invoerveld hoort klaar te staan voor het
+   * volgende verhaal — niet nog een keer vol met wat je net hebt weggestuurd.
+   * Weggooien mogen we ze niet: bijsturen stuurt ze opnieuw mee, en gooi je het
+   * voorstel weg, dan horen ze gewoon terug te komen.
+   */
+  function parkeerNotities(tekst) {
+    state.verzonden = tekst;
+    Opslag.zetVerzonden(state.project, tekst);
+    $("notities").value = "";
+    pasHoogteAan();
+    Opslag.zetConcept(state.project, "");
+    $("concept-hint").classList.add("hidden");
+  }
+
+  /** Geparkeerde notities terug in beeld, voor als er toch niets van kwam. */
+  function herstelNotities() {
+    const tekst = state.verzonden;
+    vergeetParkeer();
+    if (!tekst) return;
+    const veld = $("notities");
+    // Er kan ondertussen alweer iets bij getypt zijn; dat hoort er niet onder
+    // te verdwijnen.
+    veld.value = veld.value ? tekst + "\n" + veld.value : tekst;
+    pasHoogteAan();
+    Opslag.zetConcept(state.project, veld.value);
+    $("concept-hint").textContent = "Je notities staan weer in het invoerveld.";
+    $("concept-hint").classList.remove("hidden");
+  }
+
+  /** Geparkeerde notities horen bij een voorstel; zonder dat zijn ze los. */
+  function vergeetParkeer() {
+    state.verzonden = "";
+    Opslag.zetVerzonden(state.project, "");
   }
 
   /** Alleen de kaart uit beeld halen; het voorstel zelf blijft bewaard. */
@@ -394,12 +479,14 @@
     Bridge.voorstelWeg(project).catch(() => {});
   }
 
-  function gooiVoorstelWeg() {
+  function gooiVoorstelWeg(herstel) {
     const project = state.project;
     const kenmerk = voorstelKenmerk(state.voorstel);
     state.voorstel = null;
     sluitVoorstelKaart();
     vergeetVoorstel(project, kenmerk);
+    if (herstel) herstelNotities();
+    else vergeetParkeer();
   }
 
   /**
@@ -441,7 +528,13 @@
 
   async function maakVoorstel(bijsturing) {
     if (!state.project) return toast("Kies eerst een project.");
-    const notities = $("notities").value.trim();
+    // Bij een voorstel op het scherm is het invoerveld leeg en staan de
+    // notities geparkeerd. Bijsturen stuurt die opnieuw mee, samen met wat je
+    // er ondertussen nog bij hebt getypt.
+    const getypt = $("notities").value.trim();
+    const notities = bijsturing
+      ? [state.verzonden, getypt].filter(Boolean).join("\n")
+      : getypt || state.verzonden;
     if (!notities) return toast("Schrijf of spreek eerst in wat er gebeurd is.");
 
     const historie = [];
@@ -457,6 +550,7 @@
       // Vraag je hetzelfde voorstel bewust opnieuw aan, dan wil je het zien.
       Opslag.zetAfgehandeldVoorstel(state.project, null);
       Opslag.zetVoorstel(state.project, v);
+      parkeerNotities(notities);
       state.headerAan = (v.headerWijzigingen || []).map(() => true);
       tekenVoorstel();
       $("loggen-scroll").scrollTop = 0;
@@ -579,11 +673,9 @@
         entry: v.entry,
         headerWijzigingen: wijzigingen,
       });
+      // Het invoerveld is bij het maken van het voorstel al leeggehaald; wat
+      // er nu in staat heb je daarna getypt en hoort niet mee weg te vallen.
       gooiVoorstelWeg();
-      $("notities").value = "";
-      pasHoogteAan();
-      Opslag.zetConcept(state.project, "");
-      $("concept-hint").classList.add("hidden");
 
       const bevestiging = $("opslag-bevestiging");
       const extra = uit.headerToegepast?.length ? ` Kopgegevens bijgewerkt: ${uit.headerToegepast.join(", ")}.` : "";
@@ -1098,7 +1190,7 @@
       maakVoorstel(bij);
     });
     $("btn-opslaan").addEventListener("click", slaVoorstelOp);
-    $("btn-voorstel-weg").addEventListener("click", gooiVoorstelWeg);
+    $("btn-voorstel-weg").addEventListener("click", () => gooiVoorstelWeg(true));
 
     $("btn-vraag").addEventListener("click", stelVraag);
     $("btn-gesprek-wis").addEventListener("click", () => {
@@ -1183,6 +1275,7 @@
       Opslag.zetInstellingen({ bridgeUrl: window.PDOC_CONFIG.standaardBridgeUrl });
     }
     pasThemaToe();
+    volgToetsenbord();
     bindGebeurtenissen();
     bindPullToRefresh();
     vulInstellingen();

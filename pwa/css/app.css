@@ -24,6 +24,9 @@
   --safe-top: env(safe-area-inset-top, 0px);
   --nav-h: 56px;
   --touch: 44px;
+  /* Hoeveel het schermtoetsenbord van beeld afsnoept; app.js meet het. Alles
+     wat onderaan vastzit rekent hiermee, anders valt het erachter. */
+  --kb: 0px;
 }
 
 html[data-theme="dark"] {
@@ -60,7 +63,7 @@ html, body {
 body {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  height: calc(100dvh - var(--kb));
   overflow: hidden;
   overscroll-behavior: none;
 }
@@ -256,13 +259,13 @@ body:has(#install-banner:not(.hidden)) .tab-panel {
 .invoer-veld { position: relative; }
 .invoer-veld textarea {
   min-height: var(--touch);
-  max-height: 28vh;
+  max-height: calc((100dvh - var(--kb)) * 0.28);
   padding-right: 44px;
   resize: none;
   overflow-y: auto;
   transition: max-height 0.15s ease;
 }
-.invoer-veld textarea.groot { max-height: 55vh; }
+.invoer-veld textarea.groot { max-height: calc((100dvh - var(--kb)) * 0.55); }
 .btn-groter {
   position: absolute;
   top: 6px;
@@ -546,6 +549,9 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .overlay {
   position: fixed;
   inset: 0;
+  /* Een vast gepositioneerd blad rekent buiten het krimpende venster om, dus
+     tilt het zichzelf boven het toetsenbord. */
+  bottom: var(--kb);
   z-index: 50;
   display: flex;
   align-items: flex-end;
@@ -553,7 +559,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 }
 .overlay-blad {
   width: 100%;
-  max-height: 82vh;
+  max-height: min(82vh, calc(100dvh - var(--kb) - 24px));
   display: flex;
   flex-direction: column;
   padding: 14px 14px calc(14px + var(--safe-bottom));
@@ -593,7 +599,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--nav-h) + var(--safe-bottom) + 12px);
+  bottom: calc(var(--nav-h) + var(--safe-bottom) + var(--kb) + 12px);
   z-index: 60;
   display: flex;
   align-items: center;
@@ -626,7 +632,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
   position: fixed;
   left: 12px;
   right: 12px;
-  bottom: calc(var(--nav-h) + var(--safe-bottom) + 12px);
+  bottom: calc(var(--nav-h) + var(--safe-bottom) + var(--kb) + 12px);
   z-index: 55;
   padding: 14px;
   background: var(--bg-primary);

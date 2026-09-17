@@ -59,6 +59,15 @@
     zetConcept: (project, tekst) =>
       tekst ? schrijf("concept_" + sleutelVan(project), tekst) : verwijder("concept_" + sleutelVan(project)),
 
+    // De ruwe notities die bij een voorstel op het scherm horen. Het invoerveld
+    // is dan leeg, maar bijsturen stuurt ze opnieuw mee en een weggegooid
+    // voorstel geeft ze terug — dus moeten ze een afsluiter overleven.
+    verzonden: (project) => lees("verzonden_" + sleutelVan(project), ""),
+    zetVerzonden: (project, tekst) =>
+      tekst
+        ? schrijf("verzonden_" + sleutelVan(project), tekst)
+        : verwijder("verzonden_" + sleutelVan(project)),
+
     voorstel: (project) => lees("voorstel_" + sleutelVan(project), null),
     zetVoorstel: (project, v) =>
       v ? schrijf("voorstel_" + sleutelVan(project), v) : verwijder("voorstel_" + sleutelVan(project)),
