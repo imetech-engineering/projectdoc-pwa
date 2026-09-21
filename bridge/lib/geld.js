@@ -17,7 +17,9 @@ const { leesZip, pakUit } = require("./zip");
 const docx = require("./docx");
 
 const NR_OFFERTE = /\b((?:OF|PR)\d{6})\b/gi;
-const NR_FACTUUR = /\b((?:FA|CN)\d{6})\b/gi;
+const NR_FACTUUR = /\b((?:FA|CN|CA)\d{6})\b/gi;
+// Platforms: de klantnaam zegt dan niets over het project.
+const PLATFORMS = new Set(["fiverr", "upwork", "freelancer", "malt", "werkspot"]);
 // Alleen "echte" regie: materiaal op nacalculatie in een vaste-prijsofferte telt niet.
 const REGIE = /\b(regie|regiebasis|op uurbasis|per uur)\b/i;
 const STATUSSEN = ["open", "loopt", "doorlopend", "afgerond", "vervallen", "vervangen"];
@@ -152,7 +154,7 @@ function leesBoekhouding(pad) {
     for (const r of vk.slice(k.kop + 1)) {
       if (!r) continue;
       const nr = String(r[k.idx.nr] || "").trim().toUpperCase();
-      if (!/^(FA|CN)\d{6}$/.test(nr)) continue;
+      if (!/^(FA|CN|CA)\d{6}$/.test(nr)) continue;
       const d = r[k.idx.datum];
       let oms = r[k.idx.oms];
       if (typeof oms === "number") oms = oms > 30000 && oms < 80000 ? serieelNaarIso(oms).slice(0, 7) : String(oms);
@@ -164,6 +166,26 @@ function leesBoekhouding(pad) {
         incl: bedrag(r[k.idx.incl]),
         netto: bedrag(r[k.idx.netto]),
       });
+    }
+  }
+  // Creditnota's (CN/CA of negatief bedrag) heffen een factuur op: eerst op
+  // hetzelfde volgnummer, anders op klant en bedrag.
+  const isCredit = (f) => /^(CN|CA)/.test(f.nummer) || (f.netto != null && f.netto < 0);
+  for (const c of facturen.filter(isCredit)) {
+    const cijfers = c.nummer.slice(2);
+    const zelfde = (f) => !isCredit(f) && !f.gecrediteerd;
+    const fa =
+      facturen.find((f) => zelfde(f) && f.nummer.slice(2) === cijfers) ||
+      facturen.find(
+        (f) =>
+          zelfde(f) &&
+          plat(f.klant) === plat(c.klant) &&
+          Math.abs(Math.abs(f.netto || 0) - Math.abs(c.netto || 0)) < 0.01 &&
+          f.datum <= c.datum
+      );
+    if (fa) {
+      fa.gecrediteerd = c.nummer;
+      c.verrekend = fa.nummer;
     }
   }
   const betaald = {};
@@ -285,6 +307,7 @@ function leesOfferteDocx(pad) {
 function klantPast(klant, projTekst) {
   const k = plat(klant);
   if (!k) return false;
+  if (tokens(klant).every((t) => PLATFORMS.has(t))) return false;
   const compact = projTekst.replace(/ /g, "");
   if (k.replace(/ /g, "").length >= 5 && compact.includes(k.replace(/ /g, ""))) return true;
   const woorden = ` ${projTekst} `;
@@ -438,6 +461,20 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, uren
     const ofs = offertes();
     const boek = gecached(boekhoudingPad, leesBoekhouding) || { facturen: [], betaald: {} };
 
+    const urenBestand = zoekUrenPad();
+    const uren = (urenBestand && gecached(urenBestand, leesUren)) || [];
+    // Heeft een klant meerdere projecten, dan zegt de klantnaam alleen niet
+    // genoeg; dan moet er ook een projectnummer, offertenummer of onderwerp passen.
+    const klantCache = new Map();
+    const klantPunten = (klant) => {
+      const k = plat(klant);
+      if (!klantCache.has(k)) {
+        const n = new Set(uren.filter((r) => klantPast(klant, plat(`${r.opdrachtgever} ${r.project}`))).map((r) => r.project)).size;
+        klantCache.set(k, n >= 2 ? 5 : 10);
+      }
+      return klantCache.get(k);
+    };
+
     // offerte → project
     for (const o of ofs) {
       const keuze = k.offertes[o.nummer] || {};
@@ -449,7 +486,7 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, uren
       const scores = infos.map((p) => {
         let s = 0;
         if (p.offertesInDoc.has(o.nummer)) s += 100;
-        if (klantPast(o.klant, p.klantTekst)) s += 10;
+        if (klantPast(o.klant, p.klantTekst)) s += klantPunten(o.klant);
         s += 5 * Math.min(3, overlap(`${o.onderwerp} ${o.referentie}`, p.naamTekst, new Set(tokens(o.klant))));
         if (s < 100 && teOud(p, o.datum)) s = 0;
         return { p, score: s };
@@ -460,7 +497,13 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, uren
     }
 
     // factuur → project
-    const facturen = boek.facturen.map((f) => ({ ...f, betaald: !!boek.betaald[f.nummer], betaaldOp: typeof boek.betaald[f.nummer] === "string" ? boek.betaald[f.nummer] : null }));
+    const facturen = boek.facturen
+      .filter((f) => !f.verrekend)
+      .map((f) => ({
+        ...f,
+        betaald: !!boek.betaald[f.nummer],
+        betaaldOp: typeof boek.betaald[f.nummer] === "string" ? boek.betaald[f.nummer] : null,
+      }));
     for (const f of facturen) {
       const keuze = k.facturen[f.nummer] || {};
       if (keuze.project !== undefined) {
@@ -474,7 +517,7 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, uren
         if (p.facturenInDoc.has(f.nummer)) s += 100;
         if (p.nummer && new RegExp(`(^|\\D)${p.nummer}(\\D|$)`).test(f.omschrijving)) s += 50;
         if (ofs.some((o) => o.project === p.naam && genoemd.has(o.nummer))) s += 50;
-        if (klantPast(f.klant, p.klantTekst)) s += 10;
+        if (klantPast(f.klant, p.klantTekst)) s += klantPunten(f.klant);
         s += 5 * Math.min(3, overlap(f.omschrijving, p.naamTekst, new Set(tokens(f.klant))));
         if (s < 50 && teOud(p, f.datum)) s = 0;
         return { p, score: s };
@@ -516,13 +559,12 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, uren
         keuze = gescoord.sort((a, b) => b.s - a.s)[0].o;
       }
       f.offerte = keuze.nummer;
-      keuze.gefactureerd += f.netto || 0;
       keuze.facturen.push(f.nummer);
+      if (f.gecrediteerd) continue; // telt niet mee: is met een creditnota teruggedraaid
+      keuze.gefactureerd += f.netto || 0;
       if (EIND.test(f.omschrijving)) keuze.eindfactuur = f.nummer;
     }
     // Ureninschattingen koppelen aan projecten (projectnummer, anders naam).
-    const urenBestand = zoekUrenPad();
-    const uren = (urenBestand && gecached(urenBestand, leesUren)) || [];
     const urenPerProject = new Map();
     for (const r of uren) {
       const nr = (/^(\d{4})\b/.exec(r.project) || [])[1];
@@ -633,7 +675,7 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, uren
   /** afgerond: true/false/null (null = weer automatisch); project: naam, "-" (geen) of null (weer automatisch). */
   function zet(soort, nummer, wijziging) {
     const nr = String(nummer || "").toUpperCase();
-    const re = soort === "offerte" ? /^(OF|PR)\d{6}$/ : /^(FA|CN)\d{6}$/;
+    const re = soort === "offerte" ? /^(OF|PR)\d{6}$/ : /^(FA|CN|CA)\d{6}$/;
     if (!re.test(nr)) throw new Error("Ongeldig nummer");
     const k = keuzes();
     const bak = soort === "offerte" ? k.offertes : k.facturen;
@@ -663,7 +705,7 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, uren
       const o = offertes().find((x) => x.nummer === nr);
       return o ? o._pad : null;
     }
-    if (!/^(FA|CN)\d{6}$/.test(nr)) return null;
+    if (!/^(FA|CN|CA)\d{6}$/.test(nr)) return null;
     return factuurBestand(nr);
   }
 
@@ -681,7 +723,11 @@ function samenvatting(g) {
     );
   }
   for (const f of g.facturen || []) {
-    regels.push(`- Factuur ${f.nummer} (${f.datum}, ${f.omschrijving || "-"}): ${eur(f.netto)} excl. btw, ${f.betaald ? `betaald${f.betaaldOp ? " op " + f.betaaldOp : ""}` : "nog niet betaald"}${f.offerte ? `, hoort bij ${f.offerte}` : ""}`);
+    regels.push(
+      `- Factuur ${f.nummer} (${f.datum}, ${f.omschrijving || "-"}): ${eur(f.netto)} excl. btw, ${
+        f.gecrediteerd ? `gecrediteerd met ${f.gecrediteerd}, telt niet mee` : f.betaald ? `betaald${f.betaaldOp ? " op " + f.betaaldOp : ""}` : "nog niet betaald"
+      }${f.offerte ? `, hoort bij ${f.offerte}` : ""}`
+    );
   }
   return regels.join("\n");
 }

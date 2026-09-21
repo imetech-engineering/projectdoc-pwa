@@ -1024,3 +1024,8 @@ body:has(.invoer-sticky-bar:not(.hidden)) #toast, body:has(.install-banner:not(.
 .pdf-pagina-s { flex: 1; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; padding: 10px; }
 .pdf-pagina-s canvas { display: block; margin: 0 auto 10px; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18); border-radius: 2px; }
 .pdf-laden { padding: 40px 16px; text-align: center; color: var(--text-secondary); font-size: 0.875rem; }
+.gb-noot { margin: -6px 2px 10px; font-size: 0.6875rem; color: var(--text-tertiary); }
+.gb-factuur.gecrediteerd .gb-f-tekst strong, .geld-regel.gecrediteerd .geld-bedrag { text-decoration: line-through; color: var(--text-tertiary); }
+.geld-regel.gecrediteerd { opacity: 0.7; }
+/* statusregel onder de titel: altijd één regel */
+.app-header .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

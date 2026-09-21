@@ -4,9 +4,9 @@
  */
 window.PDOC_CONFIG = {
   /** Zichtbaar bij Instellingen → Over, zodat je kunt zien wat er draait. */
-  versie: "v18",
+  versie: "v19",
   /** De bridge die deze app nodig heeft. Loopt de pc achter, dan zegt de app dat. */
-  minimaleBridge: "1.12.0",
+  minimaleBridge: "1.12.1",
   /** Alleen handig bij lokaal testen; laat leeg voor de gepubliceerde app. */
   standaardBridgeUrl: "",
   /** Hoe lang de app op Claude wacht voordat hij de poging afbreekt. */

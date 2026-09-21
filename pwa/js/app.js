@@ -461,6 +461,8 @@
   const offerteTitel = (o) => kort(o.onderwerp, "") || kort(o.referentie, "") || o.onderwerp || "Offerte";
 
   function factuurPil(f) {
+    if (f.gecrediteerd) return `<span class="pil vervallen" title="Teruggedraaid met ${esc(f.gecrediteerd)}">Gecrediteerd</span>`;
+    if (f.netto != null && f.netto < 0) return '<span class="pil vervallen">Creditnota</span>';
     if (f.betaald) return `<span class="pil goed"${f.betaaldOp ? ` title="Betaald op ${esc(datumNl(f.betaaldOp))}"` : ""}>Betaald</span>`;
     const d = dagenGeleden(f.datum);
     return d > 30
@@ -505,7 +507,7 @@
     }
     const f = it.f;
     return (
-      `<button type="button" class="geld-regel factuur" data-geld="${esc(f.nummer)}">` +
+      `<button type="button" class="geld-regel factuur${f.gecrediteerd ? " gecrediteerd" : ""}" data-geld="${esc(f.nummer)}">` +
       `<span class="geld-ic euro" aria-hidden="true">€</span>` +
       `<span class="datum">${esc(it.datum)}</span>` +
       `<span class="geld-tekst"><strong>${esc(f.nummer)}</strong> ${esc(kort(f.omschrijving, "Factuur"))}</span>` +
@@ -549,7 +551,7 @@
       waarde = "Alles afgerond";
       soort = "afgerond";
     } else {
-      const open = facturen.filter((f) => !f.betaald).length;
+      const open = facturen.filter((f) => !f.betaald && !f.gecrediteerd && (f.netto || 0) > 0).length;
       label = "Facturen";
       waarde = open ? `${open} open` : `${facturen.length} betaald`;
       soort = open ? "open" : "afgerond";
@@ -588,9 +590,9 @@
 
   function factuurRijHtml(f) {
     return (
-      `<div class="gb-factuur" id="gb-${esc(f.nummer)}">` +
+      `<div class="gb-factuur${f.gecrediteerd ? " gecrediteerd" : ""}" id="gb-${esc(f.nummer)}">` +
       `<div class="gb-f-tekst"><strong>${esc(f.nummer)}</strong> ${esc(kort(f.omschrijving, ""))}` +
-      `<span class="gb-f-meta">${esc(datumNl(f.datum))} · ${euro(f.netto)} excl.</span></div>` +
+      `<span class="gb-f-meta">${esc(datumNl(f.datum))} · ${euro(f.netto)} excl.${f.gecrediteerd ? ` · gecrediteerd met ${esc(f.gecrediteerd)}` : ""}</span></div>` +
       factuurPil(f) +
       (f.heeftBestand ? iconKnop("pdf", "factuur", f.nummer, "ic-offerte", "Factuur bekijken") : "") +
       iconKnop("koppel", "factuur", f.nummer, "ic-koppel", "Ander project") +
@@ -655,14 +657,20 @@
     const doorlopend = offertes.filter((o) => o.status === "doorlopend");
     const klaar = offertes.filter(isKlaar);
     const los = facturen.filter((f) => !f.offerte);
-    const openstaand = facturen.filter((f) => !f.betaald).reduce((t, f) => t + (f.netto || 0), 0);
+    // Alleen wat echt telt: gecrediteerde facturen en creditnota's vallen weg.
+    const telt = facturen.filter((f) => !f.gecrediteerd);
+    const gefactureerd = telt.reduce((t, f) => t + (f.netto || 0), 0);
+    const openstaand = telt.filter((f) => !f.betaald && (f.netto || 0) > 0).reduce((t, f) => t + (f.netto || 0), 0);
+    const nogTeFactureren = [...lopend, ...doorlopend]
+      .filter((o) => o.totaalExcl)
+      .reduce((t, o) => t + Math.max(0, o.totaalExcl - (o.gefactureerd || 0)), 0);
     const delen = [];
     delen.push(
       `<div class="gb-tegels">` +
-        `<div><span>Open offerte</span><strong>${euro(lopend.reduce((t, o) => t + Math.max(0, (o.totaalExcl || 0) - (o.gefactureerd || 0)), 0)) || "€ 0"}</strong></div>` +
-        `<div><span>Gefactureerd</span><strong>${euro(facturen.reduce((t, f) => t + (f.netto || 0), 0)) || "€ 0"}</strong></div>` +
-        `<div class="${openstaand > 0.5 ? "let-op" : ""}"><span>Te ontvangen</span><strong>${euro(openstaand) || "€ 0"}</strong></div>` +
-        `</div>`
+        `<div><span>Nog te factureren</span><strong>${euro(nogTeFactureren) || "€ 0"}</strong></div>` +
+        `<div><span>Gefactureerd</span><strong>${euro(gefactureerd) || "€ 0"}</strong></div>` +
+        `<div class="${openstaand > 0.5 ? "let-op" : ""}"><span>Nog niet betaald</span><strong>${euro(openstaand) || "€ 0"}</strong></div>` +
+        `</div><p class="gb-noot">Bedragen excl. btw</p>`
     );
     if (lopend.length) delen.push(`<h3 class="gb-sectie">Lopend</h3>` + lopend.map((o) => offerteKaartHtml(o, facturen)).join(""));
     if (doorlopend.length)

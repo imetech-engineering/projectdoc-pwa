@@ -154,7 +154,7 @@ fs.rmSync(map, { recursive: true, force: true });
   const projPad = path.join(pm, "50 IMeTech Engineering", "5016 Liftprint", "Project Liftprint.docx");
   schrijfDocx(projPad, p("Liftprint") + `<w:tbl>${tr("Projectnummer", "5016 │ Lift Techniek")}${tr("Start", "2026-02")}</w:tbl>` + p("260301  Start") + p("Offerte OF260301 verstuurd"));
   const anderPad = path.join(pm, "50 IMeTech Engineering", "5020 Robot", "Project Robot.docx");
-  schrijfDocx(anderPad, p("Robot") + `<w:tbl>${tr("Projectnummer", "5020 │ Aluwi")}</w:tbl>`);
+  schrijfDocx(anderPad, p("Robot") + `<w:tbl>${tr("Projectnummer", "5020 │ Aluwi (via Fiverr)")}</w:tbl>`);
   const offerte = (nr, datum, klant, onderwerp, regels, excl) =>
     p(`Aan:\t${klant}`) +
     p(`Graag bieden we u hierbij de volgende offerte aan voor het project ${onderwerp}, zoals besproken.`) +
@@ -173,7 +173,8 @@ fs.rmSync(map, { recursive: true, force: true });
   // Mini-werkboek: Verkoopboek + Bankboek, met gedeelde strings zoals Excel dat doet.
   const strings = ["Factuurdatum", "Klant", "Omschrijving", "Factuurnr / Bon", "Bedrag incl. BTW (€)", "Netto (€)",
     "Lift Techniek", "5016 Liftprint (30% aanbetaling)", "FA260709", "5016 Liftprint restbetaling", "FA260906",
-    "Datum", "In (€)", "Factuur", "Lift Techniek FA260709", "Onbekend", "Advies", "FA260910"];
+    "Datum", "In (€)", "Factuur", "Lift Techniek FA260709", "Onbekend", "Advies", "FA260910",
+    "FA260911", "CA260911", "Fiverr", "Fiverr (andere klant)", "FA260912"];
   const sst = `<sst xmlns="x">${strings.map((t) => `<si><t>${t.replace(/&/g, "&amp;")}</t></si>`).join("")}</sst>`;
   const c = (ref, v, s) => (s ? `<c r="${ref}" t="s"><v>${v}</v></c>` : `<c r="${ref}"><v>${v}</v></c>`);
   const vk = `<worksheet><sheetData>
@@ -181,6 +182,9 @@ fs.rmSync(map, { recursive: true, force: true });
     <row r="6">${c("A6", 46223)}${c("D6", 6, 1)}${c("E6", 7, 1)}${c("F6", 8, 1)}${c("G6", 726)}${c("N6", 600)}</row>
     <row r="7">${c("A7", 46281)}${c("D7", 6, 1)}${c("E7", 9, 1)}${c("F7", 10, 1)}${c("G7", 1694)}${c("N7", 1400)}</row>
     <row r="8">${c("A8", 46286)}${c("D8", 15, 1)}${c("E8", 16, 1)}${c("F8", 17, 1)}${c("G8", 121)}${c("N8", 100)}</row>
+    <row r="9">${c("A9", 46282)}${c("D9", 6, 1)}${c("E9", 7, 1)}${c("F9", 18, 1)}${c("G9", 605)}${c("N9", 500)}</row>
+    <row r="10">${c("A10", 46282)}${c("D10", 6, 1)}${c("E10", 7, 1)}${c("F10", 19, 1)}${c("G10", -605)}${c("N10", -500)}</row>
+    <row r="11">${c("A11", 46282)}${c("D11", 20, 1)}${c("E11", 21, 1)}${c("F11", 22, 1)}${c("G11", 605)}${c("N11", 500)}</row>
   </sheetData></worksheet>`;
   const bb = `<worksheet><sheetData>
     <row r="5">${c("A5", 11, 1)}${c("B5", 2, 1)}${c("C5", 12, 1)}${c("I5", 13, 1)}</row>
@@ -223,9 +227,11 @@ fs.rmSync(map, { recursive: true, force: true });
   check("offertes aan het juiste project gekoppeld", r.offertes.length === 3 && !!o1 && !!o2);
   check("offerte-inhoud gelezen (regels, totaal, datum)", o2 && o2.regels.length === 2 && o2.totaalExcl === 3475 && o2.datum === "2026-09-16");
   check("backup-kopie van een offerte genegeerd", o2 && o2.klant === "Lift Techniek B.V.");
-  check("facturen via projectnummer gekoppeld", r.facturen.length === 2);
+  check("facturen via projectnummer gekoppeld", r.facturen.length === 3);
+  const fa911 = r.facturen.find((f) => f.nummer === "FA260911");
+  check("creditnota heft de factuur op", fa911 && fa911.gecrediteerd === "CA260911" && !r.facturen.some((f) => f.nummer === "CA260911"));
   check("betaald volgt uit het Bankboek", r.facturen.find((f) => f.nummer === "FA260709").betaald && !r.facturen.find((f) => f.nummer === "FA260906").betaald);
-  check("factuur hoort bij de oudste openstaande offerte", r.facturen.every((f) => f.offerte === "OF260301"));
+  check("factuur hoort bij de oudste openstaande offerte", r.facturen.filter((f) => !f.gecrediteerd).every((f) => f.offerte === "OF260301"));
   check("restbetaling rondt de offerte af", o1.status === "afgerond");
   check("nieuwere offerte met hetzelfde onderwerp vervangt de oude", o2.status === "vervangen" && o2.vervangenDoor === "OF260908");
   const o3 = r.offertes.find((o) => o.nummer === "OF260908");
@@ -236,6 +242,7 @@ fs.rmSync(map, { recursive: true, force: true });
   check("klantnaam koppelt offerte aan ander project", robot.offertes.length === 2 && robot.offertes.some((o) => o.nummer === "OF260905"));
   check("regie in de urenadministratie maakt een offerte doorlopend", robot.offertes.every((o) => o.status === "doorlopend"));
   check("factuur zonder duidelijke klant blijft los", robot.facturen.length === 0 && robot.losseFacturen.some((f) => f.nummer === "FA260910"));
+  check("platformnaam (Fiverr) koppelt niet op klant", robot.losseFacturen.some((f) => f.nummer === "FA260912"));
 
   g.zet("offerte", "OF260904", { afgerond: true });
   g.zet("factuur", "FA260910", { project: "Liftprint" });
