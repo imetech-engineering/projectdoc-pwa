@@ -1877,7 +1877,7 @@
       if (bezig || !hadAlEenVersie) return;
       bezig = true;
       // Niet vanzelf herladen (je kunt midden in je notities zitten): melden, jij tikt als het uitkomt.
-      toast("Nieuwe versie klaar", false, { label: "Vernieuwen", doe: () => location.reload() });
+      toast("Nieuwe versie klaar", false, { label: "Vernieuwen", doe: () => (window.IMeTechHerlaad || (() => location.reload()))() });
     });
   }
 

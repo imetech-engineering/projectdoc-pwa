@@ -1029,3 +1029,6 @@ body:has(.invoer-sticky-bar:not(.hidden)) #toast, body:has(.install-banner:not(.
 .geld-regel.gecrediteerd { opacity: 0.7; }
 /* statusregel onder de titel: altijd één regel */
 .app-header .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Echte schermhoogte (gemeten in melding.js), zodat de balk onderin na vernieuwen in beeld blijft. */
+html body { height: var(--app-h, 100dvh); }

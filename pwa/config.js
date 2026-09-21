@@ -4,7 +4,7 @@
  */
 window.PDOC_CONFIG = {
   /** Zichtbaar bij Instellingen → Over, zodat je kunt zien wat er draait. */
-  versie: "v19",
+  versie: "v20",
   /** De bridge die deze app nodig heeft. Loopt de pc achter, dan zegt de app dat. */
   minimaleBridge: "1.12.1",
   /** Alleen handig bij lokaal testen; laat leeg voor de gepubliceerde app. */
