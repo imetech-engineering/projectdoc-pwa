@@ -595,6 +595,7 @@
         `${esc(extra)}${esc(gemist)} Een kopie van de vorige versie staat in de map <code>_backups</code>.</p>`;
       bevestiging.classList.remove("hidden");
       toast("Entry toegevoegd aan het projectdocument.");
+      seinAssistent();
 
       state.projectInfo = await Bridge.project(state.project).catch(() => state.projectInfo);
       state.entries = state.projectInfo?.entries || state.entries;
@@ -1177,6 +1178,57 @@
     });
   }
 
+  // Link vanuit de assistent (?project=...&tekst=...): meteen bij het laden vastpakken, voor iets anders de adresbalk opschoont.
+  const linkParams = new URLSearchParams(location.search);
+
+  function sleutel(naam) {
+    return String(naam || "").toLowerCase().replace(/^\s*\d{3,}\s*/, "").replace(/[^a-z0-9]/g, "");
+  }
+
+  /** Project en notities overnemen uit een link van een andere IMeTech-app. */
+  async function openVanuitLink() {
+    const project = linkParams.get("project"), tekst = linkParams.get("tekst");
+    if (!project && !tekst) return;
+    naarTab("loggen");
+    if (project) {
+      const nr = (project.match(/\d{3,}/) || [])[0];
+      const k = sleutel(project);
+      const p = state.projecten.find((x) => sleutel(x.naam) === k)
+        || (nr && state.projecten.find((x) => x.naam.includes(nr) || (x.map || "").includes(nr)))
+        || state.projecten.find((x) => k && (sleutel(x.naam).includes(k) || k.includes(sleutel(x.naam))));
+      if (p) await kiesProject(p.naam);
+      else toast(`Project "${project}" niet gevonden; kies het even zelf.`, true);
+    }
+    if (tekst) {
+      const veld = $("notities");
+      veld.value = veld.value.trim() ? veld.value.trim() + "\n" + tekst : tekst;
+      pasHoogteAan();
+      veld.focus();
+      Opslag.zetConcept(state.project, veld.value);
+    }
+    window.IMeTechApps?.wisParams();
+  }
+
+  /** Seintje aan de assistent (zelfde adres/token als in de assistent-app, die op hetzelfde domein staat). */
+  async function seinAssistent() {
+    try {
+      const inst = await new Promise((ok) => {
+        const r = indexedDB.open("assistent", 1);
+        r.onupgradeneeded = () => r.result.createObjectStore("kv");
+        r.onerror = () => ok(null);
+        r.onsuccess = () => {
+          try {
+            const t = r.result.transaction("kv", "readonly").objectStore("kv").get("instellingen");
+            t.onsuccess = () => ok(t.result || null);
+            t.onerror = () => ok(null);
+          } catch (_) { ok(null); }
+        };
+      });
+      if (!inst?.adres || !inst?.token) return;
+      await fetch(inst.adres.replace(/\/$/, "") + "/api/run/projectdoc", { method: "POST", headers: { Authorization: "Bearer " + inst.token } });
+    } catch (_) { /* assistent niet bereikbaar: die leest het document bij de volgende ronde */ }
+  }
+
   async function start() {
     const i = Opslag.instellingen();
     if (!i.bridgeUrl && window.PDOC_CONFIG?.standaardBridgeUrl) {
@@ -1193,6 +1245,7 @@
     Bridge.stel(inst.bridgeUrl, inst.token);
     if (!Bridge.ingesteld()) naarTab("instellingen");
     await verbind();
+    await openVanuitLink().catch(() => {});
   }
 
   document.addEventListener("DOMContentLoaded", start);
