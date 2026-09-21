@@ -155,65 +155,63 @@
 
       <!-- ---------------------------------------------------- instellingen -->
       <section id="panel-instellingen" class="tab-panel hidden">
-        <p id="versie-regel" class="versie-regel">—</p>
-
-        <div class="card">
-          <h2>Verbinding met je pc</h2>
-          <label for="cfg-url">Adres van de bridge</label>
-          <input id="cfg-url" type="url" inputmode="url" autocomplete="off" placeholder="https://projectdoc.jouwdomein.nl" />
-          <label for="cfg-token">Token</label>
-          <input id="cfg-token" type="password" autocomplete="off" placeholder="Zoals in config.json op de pc" />
-          <div class="knop-rij">
-            <button type="button" id="btn-test" class="btn-secondary">Verbinding testen</button>
-            <button type="button" id="btn-cfg-opslaan" class="btn-primary">Opslaan</button>
-          </div>
-          <p id="test-uitslag" class="hint hidden"></p>
-          <p id="mail-status" class="hint"></p>
+        <h2 class="inst-kop">Verbinding met je pc</h2>
+        <div class="inst-kaart">
+          <details class="inst-uit" id="verbinding-uit">
+            <summary class="inst-rij"><span class="inst-label">Bridge</span><span class="inst-waarde"><i class="inst-chev"></i></span></summary>
+            <div class="inst-inhoud">
+              <label for="cfg-url">Adres van de bridge</label>
+              <input id="cfg-url" type="url" inputmode="url" autocomplete="off" placeholder="https://projectdoc.jouwdomein.nl" />
+              <label for="cfg-token">Token</label>
+              <input id="cfg-token" type="password" autocomplete="off" placeholder="Zoals in config.json op de pc" />
+              <div class="inst-knoppen">
+                <button type="button" id="btn-test" class="btn-secondary">Testen</button>
+                <button type="button" id="btn-cfg-opslaan" class="btn-primary">Opslaan</button>
+              </div>
+            </div>
+          </details>
+          <p id="test-uitslag" class="inst-noot hidden"></p>
+          <p id="mail-status" class="inst-noot"></p>
         </div>
 
-        <div class="card">
-          <h2>Spraak</h2>
-          <label class="schakel">
-            <input type="checkbox" id="cfg-voorlezen" />
-            <span>Antwoorden hardop voorlezen</span>
-          </label>
-          <label for="cfg-stem">Stem</label>
-          <select id="cfg-stem"></select>
-          <p class="hint" id="spraak-hint"></p>
-        </div>
-
-        <div class="card">
-          <h2>Weergave</h2>
-          <label for="cfg-thema">Thema</label>
-          <select id="cfg-thema">
+        <h2 class="inst-kop">Spraak en weergave</h2>
+        <div class="inst-kaart">
+          <label class="inst-rij"><span class="inst-label">Antwoorden voorlezen</span><span class="schakel"><input type="checkbox" id="cfg-voorlezen" /><i></i></span></label>
+          <label class="inst-rij" for="cfg-stem"><span class="inst-label">Stem</span><select id="cfg-stem" class="inst-select"></select></label>
+          <p class="inst-noot" id="spraak-hint"></p>
+          <label class="inst-rij" for="cfg-thema"><span class="inst-label">Thema</span><select id="cfg-thema" class="inst-select">
             <option value="auto">Volg het systeem</option>
             <option value="licht">Licht</option>
             <option value="donker">Donker</option>
-          </select>
-          <div id="install-manual" class="hint hidden">
-            Installeren: open het menu van je browser en kies <strong>Toevoegen aan startscherm</strong>.
-          </div>
-          <button type="button" id="btn-install-settings" class="btn-secondary">App installeren</button>
-          <button type="button" id="btn-update" class="btn-tekst">Zoeken naar een nieuwe versie</button>
+          </select></label>
+          <button type="button" id="btn-install-settings" class="inst-rij inst-knop"><span class="inst-label">App installeren</span><span class="inst-waarde"><i class="inst-chev"></i></span></button>
+          <p id="install-manual" class="inst-noot hidden">Open het menu van je browser en kies <strong>Toevoegen aan startscherm</strong>.</p>
+          <button type="button" id="btn-update" class="inst-rij inst-knop"><span class="inst-label">Zoeken naar een nieuwe versie</span><span class="inst-waarde"><i class="inst-chev"></i></span></button>
         </div>
 
-        <div class="card">
-          <h2>Nieuw project</h2>
-          <p class="hint">Maakt een nieuw <code>Project_[Naam].docx</code> met de opmaak van een bestaand project en een leeg logboek.</p>
-          <label for="nieuw-naam">Projectnaam</label>
-          <input id="nieuw-naam" type="text" placeholder="Bijv. Testbank" />
-          <label for="nieuw-titel">Titel bovenaan het document</label>
-          <input id="nieuw-titel" type="text" placeholder="Bijv. Voorbeeld BV — meetopstelling" />
-          <label for="nieuw-sjabloon">Opmaak overnemen van</label>
-          <select id="nieuw-sjabloon"></select>
-          <button type="button" id="btn-nieuw-project" class="btn-secondary">Project aanmaken</button>
-          <p id="nieuw-uitslag" class="hint hidden"></p>
+        <h2 class="inst-kop">Projecten</h2>
+        <div class="inst-kaart">
+          <details class="inst-uit">
+            <summary class="inst-rij"><span class="inst-label">Nieuw project</span><span class="inst-waarde"><i class="inst-chev"></i></span></summary>
+            <div class="inst-inhoud">
+              <p class="hint">Maakt een nieuw <code>Project_[Naam].docx</code> met de opmaak van een bestaand project en een leeg logboek.</p>
+              <label for="nieuw-naam">Projectnaam</label>
+              <input id="nieuw-naam" type="text" placeholder="Bijv. Testbank" />
+              <label for="nieuw-titel">Titel bovenaan het document</label>
+              <input id="nieuw-titel" type="text" placeholder="Bijv. Voorbeeld BV, meetopstelling" />
+              <label for="nieuw-sjabloon">Opmaak overnemen van</label>
+              <select id="nieuw-sjabloon"></select>
+              <div class="inst-knoppen"><button type="button" id="btn-nieuw-project" class="btn-primary">Project aanmaken</button></div>
+              <p id="nieuw-uitslag" class="hint hidden"></p>
+            </div>
+          </details>
         </div>
 
-        <div class="card">
-          <h2>Over</h2>
-          <p class="hint" id="over-tekst">—</p>
-          <button type="button" id="btn-wis-lokaal" class="btn-tekst danger">Lokale gegevens wissen</button>
+        <h2 class="inst-kop">Over</h2>
+        <div class="inst-kaart">
+          <p class="inst-noot" id="versie-regel">—</p>
+          <p class="inst-noot" id="over-tekst">—</p>
+          <button type="button" id="btn-wis-lokaal" class="inst-rij inst-knop gevaar"><span class="inst-label">Lokale gegevens wissen</span></button>
         </div>
       </section>
     </main>
