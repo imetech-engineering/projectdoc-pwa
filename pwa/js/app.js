@@ -49,7 +49,7 @@
     el.classList.toggle("fout", !!isFout);
     el.classList.remove("hidden");
     clearTimeout(toastKlok);
-    toastKlok = setTimeout(() => el.classList.add("hidden"), actie ? 7000 : isFout ? 6000 : 3200);
+    toastKlok = setTimeout(() => el.classList.add("hidden"), actie ? 12000 : isFout ? 6000 : 3200);
   }
 
   function zetStatus(tekst, soort) {
@@ -1173,8 +1173,8 @@
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (bezig || !hadAlEenVersie) return;
       bezig = true;
-      toast("Nieuwe versie — even opnieuw laden.");
-      setTimeout(() => location.reload(), 400);
+      // Niet vanzelf herladen (je kunt midden in je notities zitten): melden, jij tikt als het uitkomt.
+      toast("Nieuwe versie klaar", false, { label: "Vernieuwen", doe: () => location.reload() });
     });
   }
 

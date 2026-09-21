@@ -734,3 +734,6 @@ html[data-theme="dark"] #app-wissel { background: var(--bg-tertiary); border-col
 /* Melding altijd bovenop, en boven een vaste knoppenbalk (bijv. Opslaan/Wis) in plaats van erachter */
 #toast, .toast { z-index: 95; }
 body:has(.invoer-sticky-bar:not(.hidden)) #toast, body:has(.install-banner:not(.hidden)) #toast { bottom: calc(var(--nav-h) + var(--safe-bottom) + var(--sticky-h, 52px) + 12px); }
+
+/* Overlap: installatiebalk nooit over de projectkiezer of andere vensters */
+.install-banner { z-index: 45; }
