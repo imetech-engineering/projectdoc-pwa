@@ -2,3 +2,4 @@ bridge/config.json
 bridge/mail-token.json
 node_modules/
 *.log
+bridge/data/

@@ -52,6 +52,30 @@
     return data;
   }
 
+  /** Een bestand (pdf/docx) als blob, met de naam die de pc meegeeft. */
+  async function bestand(soort, nummer) {
+    if (!ingesteld()) throw new Error("Vul eerst het adres en het token in bij Instellingen.");
+    let res;
+    try {
+      res = await fetch(`${basis}/api/geld/bestand?soort=${encodeURIComponent(soort)}&nummer=${encodeURIComponent(nummer)}`, {
+        headers: { Authorization: "Bearer " + token },
+        cache: "no-store",
+      });
+    } catch (_) {
+      throw new Error("Geen verbinding met je pc. Controleer het adres en of de bridge draait.");
+    }
+    if (!res.ok) {
+      let melding = `Fout ${res.status} van de bridge.`;
+      try {
+        melding = (await res.json()).fout || melding;
+      } catch (_) {}
+      throw new Error(melding);
+    }
+    const kop = res.headers.get("Content-Disposition") || "";
+    const m = /filename\*=UTF-8''([^;]+)/i.exec(kop);
+    return { blob: await res.blob(), naam: m ? decodeURIComponent(m[1]) : nummer };
+  }
+
   global.Bridge = {
     stel,
     ingesteld,
@@ -67,5 +91,8 @@
     voorstelWeg: (project) => roep("/api/voorstel-weg", { body: { project }, timeoutMs: 15000 }),
     opslaan: (body) => roep("/api/opslaan", { body, timeoutMs: 60000 }),
     nieuwProject: (body) => roep("/api/nieuwproject", { body, timeoutMs: 60000 }),
+    geld: (naam) => roep("/api/geld?naam=" + encodeURIComponent(naam), { timeoutMs: 60000 }),
+    geldZet: (body) => roep("/api/geld/zet", { body, timeoutMs: 20000 }),
+    bestand,
   };
 })(window);

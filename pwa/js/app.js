@@ -24,6 +24,9 @@
     bridgeVersie: null,
     claudeInfo: null,
     wachtOpPc: false,
+    geld: null,
+    filter: "alles",
+    kiezerDoel: null,
   };
 
   /* ------------------------------------------------------------ hulpjes */
@@ -136,10 +139,22 @@
     const lijst = $("kiezer-lijst");
     lijst.innerHTML = "";
     const treffers = state.projecten.filter((p) => !zoek || p.naam.toLowerCase().includes(zoek));
+    if (state.kiezerDoel) {
+      const opties = [["-", "Geen project", "Hoort nergens bij, bijv. een afgewezen offerte"]];
+      if (state.kiezerDoel.handmatig) opties.push([null, "Automatisch", "De bridge kiest weer zelf op basis van klant en nummer"]);
+      for (const [waarde, titel, uitleg] of opties) {
+        const knop = document.createElement("button");
+        knop.type = "button";
+        knop.className = "kiezer-item kiezer-bijzonder";
+        knop.innerHTML = `<strong>${esc(titel)}</strong><span>${esc(uitleg)}</span>`;
+        knop.addEventListener("click", () => koppelVanuitKiezer(waarde));
+        lijst.appendChild(knop);
+      }
+    }
     if (!treffers.length) {
-      lijst.innerHTML = `<p class="hint">${
+      lijst.insertAdjacentHTML("beforeend", `<p class="hint">${
         state.projecten.length ? "Geen project met die naam." : "Geen projecten gevonden in de map op je pc."
-      }</p>`;
+      }</p>`);
       return;
     }
     for (const p of treffers) {
@@ -154,6 +169,7 @@
         .filter(Boolean)
         .join(" · ");
       knop.addEventListener("click", () => {
+        if (state.kiezerDoel) return koppelVanuitKiezer(p.naam);
         kiesProject(p.naam);
         sluitOverlay("kiezer");
       });
@@ -194,6 +210,8 @@
     state.gesprek = Opslag.gesprek(naam);
     tekenGesprek();
     state.entries = [];
+    state.geld = null;
+    tekenOfferteKnop();
     tekenLogboek();
 
     state.voorstel = Opslag.voorstel(naam);
@@ -203,6 +221,7 @@
     }
 
     try {
+      laadGeld(naam);
       state.projectInfo = await Bridge.project(naam);
       state.entries = state.projectInfo.entries || [];
       tekenLogboek();
@@ -291,15 +310,56 @@
       el.innerHTML = '<p class="logboek-leeg">Kies eerst een project bovenaan.</p>';
       return;
     }
-    if (!state.entries.length) {
+    const heeftGeld = geldItems().length > 0;
+    const filter = heeftGeld ? state.filter : "logboek";
+    const filterBalk = heeftGeld
+      ? `<div class="tijdlijn-filter" role="tablist" aria-label="Wat laten zien">${[
+          ["alles", "Alles"],
+          ["logboek", "Logboek"],
+          ["geld", "Offertes & facturen"],
+        ]
+          .map(
+            ([f, t]) =>
+              `<button type="button" role="tab" data-filter="${f}" aria-selected="${filter === f}" class="${filter === f ? "actief" : ""}">${t}</button>`
+          )
+          .join("")}</div>`
+      : "";
+    const items = tijdlijn(filter);
+    if (!items.length) {
       el.innerHTML =
-        '<p class="logboek-leeg">Nog geen entries in dit logboek.<br />Spreek hieronder in wat er gebeurd is.</p>';
-      return;
+        filterBalk +
+        (filter === "geld"
+          ? '<p class="logboek-leeg">Geen offertes of facturen bij dit project.</p>'
+          : '<p class="logboek-leeg">Nog geen entries in dit logboek.<br />Spreek hieronder in wat er gebeurd is.</p>');
+    } else {
+      el.innerHTML = filterBalk + items.map((it) => (it.entry ? entryHtml(it.entry) : geldRegelHtml(it))).join("");
     }
-    el.innerHTML = state.entries.map(entryHtml).join("");
     el.querySelectorAll("details.logboek-entry").forEach((blok) =>
       blok.addEventListener("toggle", () => vouwEntry(el, blok))
     );
+    el.querySelectorAll("[data-filter]").forEach((knop) =>
+      knop.addEventListener("click", () => {
+        state.filter = knop.dataset.filter;
+        Opslag.zetFilter(state.filter);
+        tekenLogboek();
+      })
+    );
+    el.querySelectorAll("[data-geld]").forEach((knop) =>
+      knop.addEventListener("click", () => openGeldblad(knop.dataset.geld))
+    );
+  }
+
+  /** Logboek en geld door elkaar, op datum; de volgorde van het document blijft leidend. */
+  function tijdlijn(filter) {
+    const entries = filter === "geld" ? [] : state.entries.map((entry) => ({ entry, datum: entry.datum }));
+    const geld = filter === "logboek" ? [] : geldItems();
+    const uit = [];
+    let g = 0;
+    for (const e of entries) {
+      while (g < geld.length && geld[g].datum > e.datum) uit.push(geld[g++]);
+      uit.push(e);
+    }
+    return uit.concat(geld.slice(g));
   }
 
   /**
@@ -354,6 +414,334 @@
 
   const esc = (s) =>
     String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+  /* -------------------------------------------------- offertes en facturen */
+
+  const jjmmdd = (iso) => String(iso || "").replace(/^\d{2}(\d{2})-(\d{2})-(\d{2}).*$/, "$1$2$3");
+  const dagenGeleden = (iso) => Math.floor((Date.now() - new Date(iso + "T12:00:00")) / 86400000);
+
+  function euro(n, altijdCenten) {
+    if (n == null || !isFinite(n)) return "";
+    const heel = Math.abs(n - Math.round(n)) < 0.005;
+    return (
+      "€ " +
+      Number(n).toLocaleString("nl-NL", {
+        minimumFractionDigits: heel && !altijdCenten ? 0 : 2,
+        maximumFractionDigits: heel && !altijdCenten ? 0 : 2,
+      })
+    );
+  }
+
+  function datumNl(iso) {
+    const d = new Date(iso + "T12:00:00");
+    return isNaN(d) ? "" : d.toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  const STATUS = { open: "Open", loopt: "Loopt", afgerond: "Afgerond" };
+
+  /** Omschrijving zonder wat je toch al weet: projectnummer en projectnaam. */
+  function kort(tekst, reserve) {
+    const naam = String(state.project || "").toLowerCase();
+    let t = String(tekst || "").replace(/^\d{4}\s+/, "").trim();
+    if (naam && t.toLowerCase().startsWith(naam)) t = t.slice(naam.length);
+    t = t.replace(/^[\s,.:;\-–(]+|[\s,.;)]+$/g, "").trim();
+    return t || reserve || "";
+  }
+  const offerteTitel = (o) => kort(o.onderwerp, "") || kort(o.referentie, "") || o.onderwerp || "Offerte";
+
+  function factuurPil(f) {
+    if (f.betaald) return `<span class="pil goed"${f.betaaldOp ? ` title="Betaald op ${esc(datumNl(f.betaaldOp))}"` : ""}>Betaald</span>`;
+    const d = dagenGeleden(f.datum);
+    return d > 30
+      ? `<span class="pil fout">Open · ${d} d</span>`
+      : '<span class="pil let-op">Open</span>';
+  }
+
+  async function laadGeld(naam) {
+    try {
+      const geld = await Bridge.geld(naam);
+      if (state.project !== naam) return;
+      state.geld = geld;
+    } catch (_) {
+      // Oudere bridge of bestanden even niet bereikbaar: dan gewoon zonder.
+      if (state.project === naam) state.geld = null;
+    }
+    tekenOfferteKnop();
+    tekenLogboek();
+    if (!$("geldblad").classList.contains("hidden")) tekenGeldblad();
+  }
+
+  function geldItems() {
+    if (!state.geld) return [];
+    const uit = [
+      ...(state.geld.offertes || []).map((o) => ({ soort: "offerte", datum: jjmmdd(o.datum), o })),
+      ...(state.geld.facturen || []).map((f) => ({ soort: "factuur", datum: jjmmdd(f.datum), f })),
+    ];
+    return uit.sort((a, b) => b.datum.localeCompare(a.datum) || (a.soort === "factuur" ? -1 : 1));
+  }
+
+  function geldRegelHtml(it) {
+    if (it.soort === "offerte") {
+      const o = it.o;
+      return (
+        `<button type="button" class="geld-regel offerte" data-geld="${esc(o.nummer)}">` +
+        `<svg class="ic geld-ic" aria-hidden="true"><use href="#ic-offerte"></use></svg>` +
+        `<span class="datum">${esc(it.datum)}</span>` +
+        `<span class="geld-tekst"><strong>${esc(o.nummer)}</strong> ${esc(offerteTitel(o))}</span>` +
+        `<span class="geld-rechts"><span class="geld-bedrag">${euro(o.totaalExcl)}</span><span class="pil ${o.status}">${STATUS[o.status]}</span></span>` +
+        `</button>`
+      );
+    }
+    const f = it.f;
+    return (
+      `<button type="button" class="geld-regel factuur" data-geld="${esc(f.nummer)}">` +
+      `<span class="geld-ic euro" aria-hidden="true">€</span>` +
+      `<span class="datum">${esc(it.datum)}</span>` +
+      `<span class="geld-tekst"><strong>${esc(f.nummer)}</strong> ${esc(kort(f.omschrijving, "Factuur"))}</span>` +
+      `<span class="geld-rechts"><span class="geld-bedrag">${euro(f.netto)}</span>${factuurPil(f)}</span>` +
+      `</button>`
+    );
+  }
+
+  /** De knop bovenin: in één blik welke offerte er loopt. */
+  function tekenOfferteKnop() {
+    const knop = $("btn-offerte");
+    const g = state.geld;
+    const offertes = (g && g.offertes) || [];
+    const facturen = (g && g.facturen) || [];
+    if (!state.project || (!offertes.length && !facturen.length)) {
+      knop.classList.add("hidden");
+      return;
+    }
+    const lopend = offertes.filter((o) => o.status !== "afgerond");
+    let label, waarde, soort, extra;
+    if (lopend.length === 1) {
+      const o = lopend[0];
+      label = STATUS[o.status];
+      waarde = [o.nummer, euro(o.totaalExcl)].filter(Boolean).join(" · ");
+      extra = o.gefactureerd && o.totaalExcl ? `${Math.round((o.gefactureerd / o.totaalExcl) * 100)}% gefactureerd` : offerteTitel(o);
+      soort = o.status;
+    } else if (lopend.length > 1) {
+      label = `${lopend.length} lopend`;
+      waarde = lopend.map((o) => o.nummer).join(", ");
+      extra = euro(lopend.reduce((t, o) => t + (o.totaalExcl || 0), 0));
+      soort = "open";
+    } else if (offertes.length) {
+      label = "Offertes";
+      waarde = "Alles afgerond";
+      soort = "afgerond";
+    } else {
+      const open = facturen.filter((f) => !f.betaald).length;
+      label = "Facturen";
+      waarde = open ? `${open} open` : `${facturen.length} betaald`;
+      soort = open ? "open" : "afgerond";
+    }
+    $("offerte-label").textContent = label;
+    $("offerte-waarde").textContent = waarde;
+    $("offerte-extra").textContent = extra || "";
+    knop.className = `offerte-knop ${soort}`;
+    knop.setAttribute("aria-label", `${label}: ${waarde}`);
+  }
+
+  let geldFocus = null;
+  function openGeldblad(focus) {
+    if (!state.geld) {
+      toast("Offertes en facturen zijn nog niet geladen.");
+      return;
+    }
+    geldFocus = focus || null;
+    if ($("geldblad").classList.contains("hidden")) $("geld-inhoud").innerHTML = "";
+    tekenGeldblad();
+    openOverlay("geldblad");
+    const doel = geldFocus && document.getElementById("gb-" + geldFocus);
+    if (doel) {
+      const afgerond = doel.closest("details.gb-afgerond");
+      if (afgerond) afgerond.open = true;
+      doel.classList.add("focus");
+      doel.scrollIntoView({ block: "center" });
+      setTimeout(() => doel.classList.remove("focus"), 1600);
+    } else {
+      $("geld-inhoud").scrollTop = 0;
+    }
+  }
+
+  const iconKnop = (actie, soort, nr, icoon, label) =>
+    `<button type="button" class="btn-mini" data-actie="${actie}" data-soort="${soort}" data-nr="${esc(nr)}" aria-label="${esc(label)}" title="${esc(label)}"><svg class="ic" aria-hidden="true"><use href="#${icoon}"></use></svg></button>`;
+
+  function factuurRijHtml(f) {
+    return (
+      `<div class="gb-factuur" id="gb-${esc(f.nummer)}">` +
+      `<div class="gb-f-tekst"><strong>${esc(f.nummer)}</strong> ${esc(kort(f.omschrijving, ""))}` +
+      `<span class="gb-f-meta">${esc(datumNl(f.datum))} · ${euro(f.netto)} excl.</span></div>` +
+      factuurPil(f) +
+      (f.heeftBestand ? iconKnop("pdf", "factuur", f.nummer, "ic-pdf", "Factuur openen") : "") +
+      iconKnop("koppel", "factuur", f.nummer, "ic-koppel", "Ander project") +
+      `</div>`
+    );
+  }
+
+  function offerteKaartHtml(o, facturen) {
+    const eigen = facturen.filter((f) => f.offerte === o.nummer);
+    const gef = o.gefactureerd
+      ? `Gefactureerd ${euro(o.gefactureerd)}${o.totaalExcl ? ` van ${euro(o.totaalExcl)}` : ""} · `
+      : "";
+    const regels = (o.regels || []).length
+      ? `<details class="gb-regels"><summary>${o.regels.length} ${o.regels.length === 1 ? "regel" : "regels"}</summary>${o.regels
+          .map((r) => `<div class="gb-regel"><span>${esc(r.omschrijving)}</span><span>${euro(r.bedrag)}</span></div>`)
+          .join("")}</details>`
+      : "";
+    const knoppen = [
+      o.heeftPdf || o.heeftDocx
+        ? `<button type="button" class="btn-secondary btn-compact" data-actie="pdf" data-soort="offerte" data-nr="${esc(o.nummer)}"><svg class="ic" aria-hidden="true"><use href="#ic-pdf"></use></svg>${o.heeftPdf ? "PDF" : "Word"}</button>`
+        : "",
+      o.status === "afgerond"
+        ? `<button type="button" class="btn-secondary btn-compact" data-actie="heropen" data-soort="offerte" data-nr="${esc(o.nummer)}">Heropenen</button>`
+        : `<button type="button" class="btn-primary btn-compact" data-actie="afronden" data-soort="offerte" data-nr="${esc(o.nummer)}">Afronden</button>`,
+      iconKnop("koppel", "offerte", o.nummer, "ic-koppel", "Ander project"),
+    ].join("");
+    return (
+      `<div class="gb-kaart ${o.status}" id="gb-${esc(o.nummer)}">` +
+      `<div class="gb-kop"><strong>${esc(o.nummer)}</strong><span class="pil ${o.status}">${STATUS[o.status]}</span>` +
+      `<span class="gb-bedrag">${euro(o.totaalExcl)}${o.totaalExcl != null ? '<small> excl.</small>' : ""}</span></div>` +
+      `<div class="gb-onderwerp">${esc(o.referentie && kort(o.onderwerp, "") === "" ? o.referentie : o.onderwerp || o.referentie || "Offerte")}</div>` +
+      `<div class="gb-meta">${[datumNl(o.datum), o.klant, o.geldigheid ? `geldig ${o.geldigheid}` : ""].filter(Boolean).map(esc).join(" · ")}</div>` +
+      `<div class="gb-reden">${gef}${esc(o.reden || "")}${o.handmatig ? ` · <button type="button" class="link-knop" data-actie="auto" data-soort="offerte" data-nr="${esc(o.nummer)}">weer automatisch</button>` : ""}</div>` +
+      regels +
+      (eigen.length ? `<div class="gb-facturen">${eigen.map(factuurRijHtml).join("")}</div>` : "") +
+      `<div class="gb-knoppen">${knoppen}</div>` +
+      `</div>`
+    );
+  }
+
+  function tekenGeldblad() {
+    const g = state.geld || { offertes: [], facturen: [], losseOffertes: [], losseFacturen: [] };
+    // Wat je open had staan blijft open na een wijziging.
+    const wasOpen = {};
+    for (const d of $("geld-inhoud").querySelectorAll("details[data-vak]")) wasOpen[d.dataset.vak] = d.open;
+    const openAttr = (vak, standaard) => ((vak in wasOpen ? wasOpen[vak] : standaard) ? " open" : "");
+    const offertes = g.offertes || [];
+    const facturen = g.facturen || [];
+    $("geld-titel").textContent = state.project || "Offertes en facturen";
+    const lopend = offertes.filter((o) => o.status !== "afgerond");
+    const klaar = offertes.filter((o) => o.status === "afgerond");
+    const los = facturen.filter((f) => !f.offerte);
+    const openstaand = facturen.filter((f) => !f.betaald).reduce((t, f) => t + (f.netto || 0), 0);
+    const delen = [];
+    delen.push(
+      `<div class="gb-tegels">` +
+        `<div><span>Open offerte</span><strong>${euro(lopend.reduce((t, o) => t + Math.max(0, (o.totaalExcl || 0) - (o.gefactureerd || 0)), 0)) || "€ 0"}</strong></div>` +
+        `<div><span>Gefactureerd</span><strong>${euro(facturen.reduce((t, f) => t + (f.netto || 0), 0)) || "€ 0"}</strong></div>` +
+        `<div class="${openstaand > 0.5 ? "let-op" : ""}"><span>Te ontvangen</span><strong>${euro(openstaand) || "€ 0"}</strong></div>` +
+        `</div>`
+    );
+    if (lopend.length) delen.push(`<h3 class="gb-sectie">Lopend</h3>` + lopend.map((o) => offerteKaartHtml(o, facturen)).join(""));
+    if (!offertes.length) delen.push('<p class="hint">Geen offerte gevonden bij dit project. Koppel er hieronder eentje als die er wel is.</p>');
+    if (klaar.length)
+      delen.push(
+        `<details class="gb-afgerond" data-vak="afgerond"${openAttr("afgerond", !lopend.length)}><summary>Afgerond (${klaar.length})</summary>${klaar
+          .map((o) => offerteKaartHtml(o, facturen))
+          .join("")}</details>`
+      );
+    if (los.length)
+      delen.push(`<h3 class="gb-sectie">Facturen zonder offerte</h3><div class="gb-kaart los">${los.map(factuurRijHtml).join("")}</div>`);
+    const losO = g.losseOffertes || [];
+    const losF = g.losseFacturen || [];
+    if (losO.length || losF.length) {
+      const rij = (soort, nr, titel, sub) =>
+        `<div class="gb-los"><div class="gb-f-tekst"><strong>${esc(nr)}</strong> ${esc(titel)}<span class="gb-f-meta">${esc(sub)}</span></div>` +
+        `<button type="button" class="btn-secondary btn-compact" data-actie="hier" data-soort="${soort}" data-nr="${esc(nr)}">Koppel</button></div>`;
+      delen.push(
+        `<details class="gb-toevoegen" data-vak="toevoegen"${openAttr("toevoegen", false)}><summary>Offerte of factuur koppelen</summary>` +
+          (losO.length ? `<p class="gb-sub">Offertes zonder project</p>` + losO.map((o) => rij("offerte", o.nummer, o.onderwerp || o.klant, [datumNl(o.datum), o.klant, euro(o.totaalExcl)].filter(Boolean).join(" · "))).join("") : "") +
+          (losF.length ? `<p class="gb-sub">Facturen zonder project</p>` + losF.map((f) => rij("factuur", f.nummer, f.omschrijving || f.klant, [datumNl(f.datum), f.klant, euro(f.netto)].filter(Boolean).join(" · "))).join("") : "") +
+          `</details>`
+      );
+    }
+    $("geld-inhoud").innerHTML = delen.join("");
+  }
+
+  function vindGeld(soort, nr) {
+    const g = state.geld || {};
+    return soort === "offerte"
+      ? (g.offertes || []).find((o) => o.nummer === nr)
+      : (g.facturen || []).find((f) => f.nummer === nr);
+  }
+
+  async function geldZet(wijziging, melding, terug) {
+    const project = state.project;
+    try {
+      await Bridge.geldZet(wijziging);
+    } catch (e) {
+      fout(e);
+      return;
+    }
+    haptic(15);
+    await laadGeld(project);
+    toast(melding, false, terug ? { label: "Ongedaan", doe: () => geldZet(terug, "Teruggezet.") } : null);
+  }
+
+  async function geldActie(knop) {
+    const { actie, soort, nr } = knop.dataset;
+    const item = vindGeld(soort, nr);
+    const basis = { soort, nummer: nr };
+    if (actie === "pdf") return openBestand(soort, nr, knop);
+    if (actie === "afronden" || actie === "heropen" || actie === "auto") {
+      const vorige = item && item.handmatig ? item.status === "afgerond" : null;
+      const nieuw = actie === "afronden" ? true : actie === "heropen" ? false : null;
+      geldFocus = nr;
+      return geldZet(
+        { ...basis, afgerond: nieuw },
+        actie === "afronden" ? `${nr} afgerond.` : actie === "heropen" ? `${nr} staat weer open.` : `${nr} volgt weer de facturen.`,
+        { ...basis, afgerond: vorige }
+      );
+    }
+    if (actie === "hier") {
+      return geldZet({ ...basis, project: state.project }, `${nr} gekoppeld aan ${state.project}.`, { ...basis, project: null });
+    }
+    if (actie === "koppel") {
+      state.kiezerDoel = { ...basis, handmatig: item && item.koppeling === "handmatig" };
+      sluitOverlay("geldblad");
+      $("kiezer-titel").textContent = `${nr} koppelen aan`;
+      $("kiezer-zoek").value = "";
+      tekenKiezer();
+      openOverlay("kiezer");
+    }
+  }
+
+  async function koppelVanuitKiezer(naam) {
+    const doel = state.kiezerDoel;
+    state.kiezerDoel = null;
+    sluitOverlay("kiezer");
+    $("kiezer-titel").textContent = "Project kiezen";
+    const terug = { soort: doel.soort, nummer: doel.nummer, project: doel.handmatig ? state.project : null };
+    await geldZet(
+      { soort: doel.soort, nummer: doel.nummer, project: naam },
+      naam === "-" ? `${doel.nummer} hoort nu bij geen project.` : naam === null ? `${doel.nummer} wordt weer automatisch gekoppeld.` : `${doel.nummer} verplaatst naar ${naam}.`,
+      terug
+    );
+    openGeldblad();
+  }
+
+  async function openBestand(soort, nr, knop) {
+    if (knop) knop.disabled = true;
+    toast(`${nr} ophalen…`);
+    try {
+      const { blob, naam } = await Bridge.bestand(soort, nr);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = naam;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      toast(`${naam} staat in je downloads.`);
+    } catch (e) {
+      fout(e);
+    } finally {
+      if (knop) knop.disabled = false;
+    }
+  }
 
   /* ----------------------------------------------------------- voorstel */
 
@@ -935,6 +1323,7 @@
         state.projectInfo = await Bridge.project(state.project);
         state.entries = state.projectInfo.entries || [];
         tekenLogboek();
+        await laadGeld(state.project);
       }
       toonVerbindingsstatus();
       toast("Bijgewerkt.");
@@ -1017,6 +1406,8 @@
     );
 
     $("btn-project").addEventListener("click", async () => {
+      state.kiezerDoel = null;
+      $("kiezer-titel").textContent = "Project kiezen";
       openOverlay("kiezer");
       $("kiezer-zoek").value = "";
       tekenKiezer();
@@ -1030,7 +1421,24 @@
       }
     });
     $("btn-project-info").addEventListener("click", toonInfo);
-    $("btn-kiezer-dicht").addEventListener("click", () => sluitOverlay("kiezer"));
+    const sluitKiezer = () => {
+      sluitOverlay("kiezer");
+      if (state.kiezerDoel) {
+        state.kiezerDoel = null;
+        $("kiezer-titel").textContent = "Project kiezen";
+        openGeldblad();
+      }
+    };
+    $("btn-kiezer-dicht").addEventListener("click", sluitKiezer);
+    $("btn-offerte").addEventListener("click", () => {
+      const lopend = ((state.geld && state.geld.offertes) || []).filter((o) => o.status !== "afgerond");
+      openGeldblad(lopend.length === 1 ? lopend[0].nummer : null);
+    });
+    $("btn-geld-dicht").addEventListener("click", () => sluitOverlay("geldblad"));
+    $("geld-inhoud").addEventListener("click", (e) => {
+      const knop = e.target.closest("[data-actie]");
+      if (knop) geldActie(knop);
+    });
     $("btn-info-dicht").addEventListener("click", () => sluitOverlay("infoblad"));
     $("kiezer-zoek").addEventListener("input", tekenKiezer);
     $("btn-kiezer-ververs").addEventListener("click", async () => {
@@ -1042,9 +1450,11 @@
         fout(e);
       }
     });
-    ["kiezer", "infoblad"].forEach((id) =>
+    ["kiezer", "infoblad", "geldblad"].forEach((id) =>
       $(id).addEventListener("click", (e) => {
-        if (e.target.id === id) sluitOverlay(id);
+        if (e.target.id !== id) return;
+        if (id === "kiezer") sluitKiezer();
+        else sluitOverlay(id);
       })
     );
 
@@ -1235,6 +1645,7 @@
       Opslag.zetInstellingen({ bridgeUrl: window.PDOC_CONFIG.standaardBridgeUrl });
     }
     pasThemaToe();
+    state.filter = Opslag.filter();
     bindGebeurtenissen();
     bindPullToRefresh();
     vulInstellingen();

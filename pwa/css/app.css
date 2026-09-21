@@ -737,3 +737,190 @@ body:has(.invoer-sticky-bar:not(.hidden)) #toast, body:has(.install-banner:not(.
 
 /* Overlap: installatiebalk nooit over de projectkiezer of andere vensters */
 .install-banner { z-index: 45; }
+
+/* ------------------------------------------------ offertes en facturen */
+
+.offerte-knop {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 38px;
+  padding: 6px 12px 6px 14px;
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.offerte-knop:active { background: var(--bg-hover); }
+.offerte-knop > .ic { flex-shrink: 0; width: 17px; height: 17px; color: var(--text-tertiary); }
+.offerte-knop.open > .ic:first-child { color: var(--let-op); }
+.offerte-knop.loopt > .ic:first-child { color: var(--accent); }
+.offerte-knop.open .pil { color: var(--let-op); background: var(--let-op-light); }
+.offerte-knop.loopt .pil { color: var(--accent); background: var(--accent-light); }
+.offerte-knop.afgerond .pil { color: var(--goed); background: var(--goed-light); }
+.offerte-waarde { flex-shrink: 0; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.offerte-extra { flex: 1; min-width: 0; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.offerte-chev { flex-shrink: 0; width: 16px; height: 16px; margin-left: auto; color: var(--text-tertiary); }
+
+/* filter boven de tijdlijn */
+.tijdlijn-filter {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 10px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+}
+.tijdlijn-filter button {
+  flex: 1;
+  min-height: 34px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tijdlijn-filter button.actief { color: var(--text-primary); background: var(--bg-primary); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+
+/* compacte regel in de tijdlijn */
+.geld-regel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--touch);
+  margin-bottom: 8px;
+  padding: 6px 10px 6px 12px;
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.geld-regel.factuur { border-left-color: var(--goed); }
+.geld-regel:active { background: var(--bg-hover); }
+.geld-regel .datum { flex-shrink: 0; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+.geld-ic { flex-shrink: 0; width: 16px; height: 16px; color: var(--accent); }
+.geld-ic.euro {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--goed);
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+}
+.geld-tekst { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-secondary); }
+.geld-tekst strong { color: var(--text-primary); font-weight: 600; }
+.geld-rechts { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.geld-bedrag { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.pil {
+  display: inline-block;
+  padding: 1px 7px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+}
+.pil.open, .pil.let-op { color: var(--let-op); background: var(--let-op-light); }
+.pil.loopt { color: var(--accent); background: var(--accent-light); }
+.pil.afgerond, .pil.goed { color: var(--goed); background: var(--goed-light); }
+.pil.fout { color: var(--danger); background: var(--danger-light); }
+
+/* detailblad */
+.geld-inhoud { overflow-y: auto; min-height: 0; margin: 0 -2px; padding: 0 2px; }
+.gb-tegels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
+.gb-tegels > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.gb-tegels span { font-size: 0.6875rem; color: var(--text-tertiary); line-height: 1.2; }
+.gb-tegels strong { font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
+.gb-tegels .let-op strong { color: var(--let-op); }
+.gb-sectie { margin: 4px 2px 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-tertiary); }
+.gb-kaart {
+  margin-bottom: 10px;
+  padding: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: box-shadow 0.3s ease;
+}
+.gb-kaart.los { padding: 4px 12px; }
+.gb-kaart.focus, .gb-factuur.focus { box-shadow: 0 0 0 2px var(--accent); }
+.gb-kop { display: flex; align-items: center; gap: 8px; }
+.gb-kop strong { font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
+.gb-bedrag { margin-left: auto; font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.gb-bedrag small { font-size: 0.6875rem; font-weight: 500; color: var(--text-tertiary); }
+.gb-onderwerp { margin-top: 4px; font-size: 0.9375rem; font-weight: 600; line-height: 1.35; }
+.gb-meta { margin-top: 2px; font-size: 0.75rem; color: var(--text-tertiary); }
+.gb-reden { margin-top: 6px; font-size: 0.8125rem; color: var(--text-secondary); }
+.link-knop { padding: 0; font: inherit; color: var(--accent); background: none; border: 0; text-decoration: underline; cursor: pointer; }
+.gb-regels { margin-top: 8px; font-size: 0.8125rem; }
+.gb-regels summary { cursor: pointer; color: var(--text-secondary); font-weight: 600; }
+.gb-regel { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--border); }
+.gb-regel span:last-child { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.gb-facturen { margin-top: 8px; border-top: 1px solid var(--border); }
+.gb-factuur, .gb-los { display: flex; align-items: center; gap: 6px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.gb-factuur:last-child, .gb-los:last-child { border-bottom: 0; }
+.gb-f-tekst { flex: 1; min-width: 0; font-size: 0.8125rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gb-f-tekst strong { color: var(--text-primary); font-weight: 600; }
+.gb-f-meta { display: block; font-size: 0.75rem; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.btn-mini {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.btn-mini .ic { width: 17px; height: 17px; }
+.btn-mini:disabled { opacity: 0.5; }
+.gb-knoppen { display: flex; gap: 8px; margin-top: 10px; }
+.gb-knoppen .btn-primary, .gb-knoppen .btn-secondary { flex: 1; min-height: 36px; gap: 6px; }
+.gb-knoppen .btn-mini { width: 40px; height: auto; }
+.gb-knoppen .ic { width: 16px; height: 16px; }
+.gb-afgerond, .gb-toevoegen { margin-bottom: 10px; }
+.gb-afgerond > summary, .gb-toevoegen > summary {
+  padding: 8px 2px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.gb-afgerond .gb-kaart { opacity: 0.92; }
+.gb-toevoegen { padding: 0 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.gb-sub { margin: 6px 0 2px; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-tertiary); }
+.gb-los .btn-compact { min-height: 34px; padding: 6px 12px; }
+.kiezer-bijzonder { border-style: dashed; }

@@ -44,6 +44,16 @@
       <path d="M8 21v-7h8v7" /><path d="M8 3v5h6" />
     </symbol>
     <symbol id="ic-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></symbol>
+    <symbol id="ic-offerte" viewBox="0 0 24 24">
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" />
+      <path d="M9 13h6M9 17h4" />
+    </symbol>
+    <symbol id="ic-pdf" viewBox="0 0 24 24">
+      <path d="M12 4v11" /><path d="M7.5 10.5L12 15l4.5-4.5" /><path d="M5 19h14" />
+    </symbol>
+    <symbol id="ic-koppel" viewBox="0 0 24 24">
+      <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+    </symbol>
     <symbol id="ic-vernieuwen" viewBox="0 0 24 24">
       <path d="M4 12a8 8 0 0 1 13.7-5.7L20 8" /><path d="M20 3v5h-5" />
       <path d="M20 12a8 8 0 0 1-13.7 5.7L4 16" /><path d="M4 21v-5h5" />
@@ -77,6 +87,13 @@
       </button>
       <button type="button" id="btn-project-info" class="btn-icoon" aria-label="Projectgegevens" title="Projectgegevens"><svg class="ic" aria-hidden="true"><use href="#ic-info"></use></svg></button>
     </div>
+    <button type="button" id="btn-offerte" class="offerte-knop hidden" aria-label="Offertes en facturen van dit project">
+      <svg class="ic" aria-hidden="true"><use href="#ic-offerte"></use></svg>
+      <span id="offerte-label" class="pil">Open</span>
+      <span id="offerte-waarde" class="offerte-waarde"></span>
+      <span id="offerte-extra" class="offerte-extra"></span>
+      <svg class="ic offerte-chev" aria-hidden="true"><use href="#ic-chevron"></use></svg>
+    </button>
 
     <main>
       <!-- ---------------------------------------------------------- loggen -->
@@ -226,12 +243,23 @@
     <div id="kiezer" class="overlay hidden" role="dialog" aria-label="Project kiezen">
       <div class="overlay-blad">
         <div class="overlay-kop">
-          <h2>Project kiezen</h2>
+          <h2 id="kiezer-titel">Project kiezen</h2>
           <button type="button" id="btn-kiezer-dicht" class="btn-icoon" aria-label="Sluiten"><svg class="ic" aria-hidden="true"><use href="#ic-sluiten"></use></svg></button>
         </div>
         <input id="kiezer-zoek" type="search" placeholder="Zoeken…" autocomplete="off" />
         <div id="kiezer-lijst" class="kiezer-lijst"></div>
         <button type="button" id="btn-kiezer-ververs" class="btn-tekst"><svg class="ic" aria-hidden="true"><use href="#ic-vernieuwen"></use></svg><span>Lijst verversen</span></button>
+      </div>
+    </div>
+
+    <!-- offertes en facturen -->
+    <div id="geldblad" class="overlay hidden" role="dialog" aria-label="Offertes en facturen">
+      <div class="overlay-blad">
+        <div class="overlay-kop">
+          <h2 id="geld-titel">Offertes en facturen</h2>
+          <button type="button" id="btn-geld-dicht" class="btn-icoon" aria-label="Sluiten"><svg class="ic" aria-hidden="true"><use href="#ic-sluiten"></use></svg></button>
+        </div>
+        <div id="geld-inhoud" class="geld-inhoud"></div>
       </div>
     </div>
 

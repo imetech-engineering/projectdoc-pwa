@@ -75,6 +75,10 @@
     zetGesprek: (project, beurten) => schrijf("gesprek_" + sleutelVan(project), beurten.slice(-20)),
     wisGesprek: (project) => verwijder("gesprek_" + sleutelVan(project)),
 
+    // Tijdlijnfilter: "alles", "logboek" of "geld".
+    filter: () => lees("filter", "alles"),
+    zetFilter: (f) => schrijf("filter", f),
+
     wisAlles() {
       try {
         Object.keys(localStorage)

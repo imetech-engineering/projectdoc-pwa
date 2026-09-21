@@ -24,8 +24,9 @@ const { vraagClaude, vraagJson, zelftest, startwijze } = require("./lib/claude")
 const mailZoeker = require("./lib/mail");
 const { gekoppeld: mailGekoppeld } = require("./lib/graph");
 const { vraagPrompt, voorstelPrompt, SCHEMA_VOORSTEL } = require("./lib/prompts");
+const { maakGeld } = require("./lib/geld");
 
-const VERSIE = "1.10.0";
+const VERSIE = "1.11.0";
 const MAX_BODY = 2 * 1024 * 1024;
 const CONFIG_PAD = process.env.PROJECTDOC_CONFIG || path.join(__dirname, "config.json");
 
@@ -70,6 +71,15 @@ function laadConfig() {
 
 const config = laadConfig();
 const claudeOpties = { model: config.model, commando: config.claudeCommando };
+
+// Offertes en facturen: standaard de mappen naast "04 Klanten & projecten" in OneDrive.
+const geld = maakGeld({
+  projectenMap: config.projectenMap,
+  offertesMap: config.offertesMap,
+  facturenMap: config.facturenMap,
+  boekhoudingPad: config.boekhoudingPad,
+  keuzesPad: path.join(__dirname, "data", "geld_keuzes.json"),
+});
 
 /* -------------------------------------------------------------- projecten */
 
@@ -433,6 +443,47 @@ async function afhandelen(req, res, url) {
     docx.bewaar(p.pad, onderdelen, nieuw);
     projectCache.tijd = 0;
     return { ok: true, bestand: p.bestand, backup, headerToegepast: toegepast, headerOvergeslagen: overgeslagen };
+  }
+
+  if (pad === "/api/geld" && req.method === "GET") {
+    const p = zoekProject(url.searchParams.get("naam"));
+    if (!p) return { fout: "Project niet gevonden" };
+    return geld.voorProject(p.naam, projecten());
+  }
+
+  if (pad === "/api/geld/zet" && req.method === "POST") {
+    const body = await leesBody(req);
+    const wijziging = {};
+    if ("afgerond" in body) wijziging.afgerond = body.afgerond === null ? null : !!body.afgerond;
+    if ("project" in body) {
+      if (body.project === null || body.project === "-") wijziging.project = body.project;
+      else {
+        const doel = zoekProject(body.project);
+        if (!doel) return { fout: "Project niet gevonden" };
+        wijziging.project = doel.naam;
+      }
+    }
+    geld.zet(body.soort === "factuur" ? "factuur" : "offerte", body.nummer, wijziging);
+    return { ok: true };
+  }
+
+  if (pad === "/api/geld/bestand" && req.method === "GET") {
+    const bestand = geld.bestand(url.searchParams.get("soort"), url.searchParams.get("nummer"));
+    if (!bestand || !fs.existsSync(bestand)) return { fout: "Bestand niet gevonden", status: 404 };
+    const inhoud = fs.readFileSync(bestand);
+    const naam = path.basename(bestand);
+    res.writeHead(200, {
+      "Content-Type": /\.pdf$/i.test(naam)
+        ? "application/pdf"
+        : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "Content-Length": inhoud.length,
+      "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(naam)}`,
+      "Cache-Control": "no-store",
+      ...corsHeaders(req.headers.origin),
+      "Access-Control-Expose-Headers": "Content-Disposition",
+    });
+    res.end(inhoud);
+    return {};
   }
 
   if (pad === "/api/nieuwproject" && req.method === "POST") {

@@ -46,6 +46,19 @@ Onder het invoerveld staat het logboek zelf, ingeklapt: je ziet de datum en de
 kop van elke entry, en tikken vouwt er precies één open. Het voorstel waar je
 op dat moment aan werkt staat er los boven en blijft wél open staan.
 
+**Offertes en facturen.** Onder de projectnaam staat een strook met de lopende
+offerte (nummer, bedrag, status); tik erop voor alle offertes van het project,
+met regels, gekoppelde facturen, betaald of open, en de PDF. In het logboek
+staan ze als smalle regels op datum tussen de entries, met een filter
+Alles / Logboek / Offertes & facturen. De bridge leest ze uit `03 Offertes`,
+het Verkoopboek en Bankboek in `Boekhouding_IMeTech.xlsx` en de pdf's in
+`01 Verkoop facturen` (alleen lezen). Koppelen gaat op offertenummer in het
+projectdocument, projectnummer in de factuuromschrijving en klantnaam. Een
+offerte is afgerond zodra de facturen hem dekken of er een eind-/restfactuur
+is; afronden, heropenen en een ander project kiezen kan ook met de hand. Die
+keuzes staan in `bridge/data/geld_keuzes.json`. Andere mappen? Zet
+`offertesMap`, `facturenMap` of `boekhoudingPad` in `config.json`.
+
 **Vragen.** Stel vragen over het project ("wat staat er nog open?", "wat was er
 afgesproken over de levertijd?"). Antwoorden komen alleen uit het
 projectdocument zelf, met vermelding van de entry waar ze vandaan komen. Laat
