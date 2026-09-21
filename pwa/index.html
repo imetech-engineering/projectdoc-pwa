@@ -265,15 +265,17 @@
 
     <!-- pdf bekijken -->
     <div id="pdfblad" class="pdf-overlay hidden" role="dialog" aria-label="Document bekijken">
-      <div class="pdf-kop">
-        <h2 id="pdf-titel">Document</h2>
-        <button type="button" id="btn-pdf-uit" class="btn-mini" aria-label="Uitzoomen" title="Uitzoomen">&minus;</button>
-        <span id="pdf-zoom" class="pdf-zoom">100%</span>
-        <button type="button" id="btn-pdf-in" class="btn-mini" aria-label="Inzoomen" title="Inzoomen">+</button>
-        <button type="button" id="btn-pdf-bewaar" class="btn-mini" aria-label="Opslaan of delen" title="Opslaan of delen"><svg class="ic" aria-hidden="true"><use href="#ic-pdf"></use></svg></button>
-        <button type="button" id="btn-pdf-dicht" class="btn-icoon" aria-label="Sluiten"><svg class="ic" aria-hidden="true"><use href="#ic-sluiten"></use></svg></button>
-      </div>
+      <div class="pdf-titelbalk"><span id="pdf-titel">Document</span></div>
       <div id="pdf-paginas" class="pdf-pagina-s"></div>
+      <div class="pdf-balk">
+        <button type="button" id="btn-pdf-dicht" class="pdf-sluit"><svg class="ic" aria-hidden="true"><use href="#ic-sluiten"></use></svg><span>Sluiten</span></button>
+        <div class="pdf-zoom-groep">
+          <button type="button" id="btn-pdf-uit" class="pdf-rond" aria-label="Uitzoomen">&minus;</button>
+          <span id="pdf-zoom" class="pdf-zoom">100%</span>
+          <button type="button" id="btn-pdf-in" class="pdf-rond" aria-label="Inzoomen">+</button>
+        </div>
+        <button type="button" id="btn-pdf-bewaar" class="pdf-rond" aria-label="Opslaan of delen" title="Opslaan of delen"><svg class="ic" aria-hidden="true"><use href="#ic-pdf"></use></svg></button>
+      </div>
     </div>
 
     <!-- projectgegevens -->

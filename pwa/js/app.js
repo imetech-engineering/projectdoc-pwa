@@ -108,6 +108,8 @@
       $("panel-" + n).classList.toggle("hidden", n !== naam)
     );
     if (naam === "vragen") tekenGesprek();
+    if (naam === "loggen") meldLaagDicht("tab");
+    else meldLaagOpen("tab");
   }
 
   /* ---------------------------------------------------------- projecten */
@@ -124,7 +126,7 @@
         toonMailStatus(st.mail);
         if (bridgeLooptAchter() && !oudeBridgeGemeld) {
           oudeBridgeGemeld = true;
-          toast(`De bridge op je pc is versie ${st.versie} — herstart hem even, de app verwacht ${window.PDOC_CONFIG.minimaleBridge}.`, true);
+          toast(`De bridge op je pc is versie ${st.versie}. Herstart hem even, de app verwacht ${window.PDOC_CONFIG.minimaleBridge}.`, true);
         }
       })
       .catch(() => {});
@@ -930,7 +932,7 @@
       pdfStaat.zoom = 1;
       $("pdf-titel").textContent = naam.replace(/\.pdf$/i, "");
       $("pdf-paginas").innerHTML = '<p class="pdf-laden">Document laden…</p>';
-      $("pdfblad").classList.remove("hidden");
+      openOverlay("pdfblad");
       const lib = await laadPdfJs();
       pdfStaat.doc = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
       await tekenPdf();
@@ -946,7 +948,7 @@
   }
 
   function sluitPdf() {
-    $("pdfblad").classList.add("hidden");
+    sluitOverlay("pdfblad");
     pdfStaat.teken++;
     if (pdfStaat.doc) pdfStaat.doc.destroy();
     pdfStaat.doc = null;
@@ -1327,7 +1329,7 @@
     toonVersies();
     $("over-tekst").textContent =
       "De app praat met Claude Code op je eigen pc. Er is geen API-sleutel en er zijn geen " +
-      "losse API-kosten — het draait op je Claude-abonnement.";
+      "losse API-kosten, het draait op je Claude-abonnement.";
   }
 
   function toonMailStatus(status) {
@@ -1338,7 +1340,7 @@
       ? "Mail meelezen staat uit."
       : status.gekoppeld
         ? "Mail meelezen staat aan."
-        : "Mail staat aan maar is nog niet gekoppeld — draai op je pc: node koppel-mail.js";
+        : "Mail staat aan maar is nog niet gekoppeld. Draai op je pc: node koppel-mail.js";
     el.classList.toggle("fout", status.aan && !status.gekoppeld);
   }
 
@@ -1361,7 +1363,7 @@
     regel.classList.toggle("fout", oud);
     regel.textContent =
       `App ${app} · bridge ${state.bridgeVersie}${claude}` +
-      (oud ? ` — verouderd, herstart de bridge op je pc (${window.PDOC_CONFIG.minimaleBridge} of nieuwer)` : "");
+      (oud ? `, verouderd: herstart de bridge op je pc (${window.PDOC_CONFIG.minimaleBridge} of nieuwer)` : "");
   }
 
   /**
@@ -1471,19 +1473,72 @@
 
   /* ------------------------------------------------------------ overlays */
 
-  const openOverlay = (id) => $(id).classList.remove("hidden");
-  const sluitOverlay = (id) => $(id).classList.add("hidden");
+  /*
+   * Terugknop van de telefoon: sluit eerst wat er open staat (preview, blad,
+   * kiezer, andere tab) in plaats van de hele app. Zolang er iets open is staat
+   * er precies één extra stap in de geschiedenis; die vangen we hier op.
+   */
+  const lagen = [];
+  const sluiters = {};
+  let laagInHistorie = false;
+  let negeerPop = false;
+
+  function meldLaagOpen(id) {
+    const i = lagen.indexOf(id);
+    if (i >= 0) lagen.splice(i, 1);
+    lagen.push(id);
+    if (!laagInHistorie) {
+      try {
+        history.pushState({ pdocLaag: true }, "");
+        laagInHistorie = true;
+      } catch (_) {}
+    }
+  }
+
+  function meldLaagDicht(id) {
+    const i = lagen.indexOf(id);
+    if (i >= 0) lagen.splice(i, 1);
+    if (lagen.length || !laagInHistorie) return;
+    // Even wachten: vaak gaat er direct een volgende laag open (blad → kiezer).
+    setTimeout(() => {
+      if (lagen.length || !laagInHistorie) return;
+      laagInHistorie = false;
+      negeerPop = true;
+      history.back();
+    }, 0);
+  }
+
+  window.addEventListener("popstate", () => {
+    if (negeerPop) {
+      negeerPop = false;
+      return;
+    }
+    if (!laagInHistorie) return;
+    laagInHistorie = false;
+    const boven = lagen[lagen.length - 1];
+    if (boven) (sluiters[boven] || sluitOverlay)(boven);
+    if (lagen.length) meldLaagOpen(lagen[lagen.length - 1]);
+  });
+
+  function openOverlay(id) {
+    $(id).classList.remove("hidden");
+    meldLaagOpen(id);
+  }
+  function sluitOverlay(id) {
+    $(id).classList.add("hidden");
+    meldLaagDicht(id);
+  }
 
   /* -------------------------------------------------------------- opstart */
 
   function toonVerbindingsstatus() {
     if (!Bridge.ingesteld()) {
-      zetStatus("Nog niet verbonden — vul Instellingen in", "fout");
+      zetStatus("Nog niet verbonden, vul Instellingen in", "fout");
       return;
     }
     if (!state.project) {
       const n = state.projecten.length;
-      zetStatus(n === 1 ? "1 project gevonden — kies het" : `${n} projecten — kies er een`);
+      zetStatus(n === 1 ? "1 project gevonden, kies het" : `${n} projecten, kies er een`);
       return;
     }
     // De status staat meestal verstopt in een veld als "2026-03 | Status: Actief".
@@ -1632,6 +1687,8 @@
       }
     });
     $("btn-project-info").addEventListener("click", toonInfo);
+    sluiters.pdfblad = sluitPdf;
+    sluiters.tab = () => naarTab("loggen");
     const sluitKiezer = () => {
       sluitOverlay("kiezer");
       if (state.kiezerDoel) {
@@ -1640,6 +1697,7 @@
         openGeldblad();
       }
     };
+    sluiters.kiezer = sluitKiezer;
     $("btn-kiezer-dicht").addEventListener("click", sluitKiezer);
     $("btn-offerte").addEventListener("click", () => {
       const lopend = ((state.geld && state.geld.offertes) || []).filter(isLopend);
@@ -1651,6 +1709,15 @@
       if (knop) geldActie(knop);
     });
     $("btn-pdf-dicht").addEventListener("click", sluitPdf);
+    let laatsteTik = 0;
+    $("pdf-paginas").addEventListener("click", () => {
+      const nu = Date.now();
+      if (nu - laatsteTik < 320) {
+        pdfStaat.zoom = pdfStaat.zoom === 1 ? 2 : 1;
+        tekenPdf();
+        laatsteTik = 0;
+      } else laatsteTik = nu;
+    });
     $("btn-pdf-in").addEventListener("click", () => zoomPdf(1));
     $("btn-pdf-uit").addEventListener("click", () => zoomPdf(-1));
     $("btn-pdf-bewaar").addEventListener("click", () => pdfStaat.blob && bewaarBlob(pdfStaat.blob, pdfStaat.naam));
@@ -1782,7 +1849,7 @@
       if (!registratie) return toast("Nog geen versiebeheer actief; herlaad de pagina.");
       await registratie.update();
       // Is er iets nieuws, dan neemt dat het zo over en herlaadt de app zichzelf.
-      if (registratie.installing || registratie.waiting) toast("Nieuwe versie gevonden — even opnieuw laden.");
+      if (registratie.installing || registratie.waiting) toast("Nieuwe versie gevonden, even opnieuw laden.");
       else toast(`Je hebt de nieuwste versie (${window.PDOC_CONFIG?.versie || "?"}).`);
     } catch (_) {
       toast("Kon niet naar een nieuwe versie zoeken.", true);
