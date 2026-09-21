@@ -24,9 +24,9 @@ const { vraagClaude, vraagJson, zelftest, startwijze } = require("./lib/claude")
 const mailZoeker = require("./lib/mail");
 const { gekoppeld: mailGekoppeld } = require("./lib/graph");
 const { vraagPrompt, voorstelPrompt, SCHEMA_VOORSTEL } = require("./lib/prompts");
-const { maakGeld } = require("./lib/geld");
+const { maakGeld, samenvatting: geldSamenvatting } = require("./lib/geld");
 
-const VERSIE = "1.11.0";
+const VERSIE = "1.12.0";
 const MAX_BODY = 2 * 1024 * 1024;
 const CONFIG_PAD = process.env.PROJECTDOC_CONFIG || path.join(__dirname, "config.json");
 
@@ -78,6 +78,7 @@ const geld = maakGeld({
   offertesMap: config.offertesMap,
   facturenMap: config.facturenMap,
   boekhoudingPad: config.boekhoudingPad,
+  urenPad: config.urenPad,
   keuzesPad: path.join(__dirname, "data", "geld_keuzes.json"),
 });
 
@@ -333,9 +334,16 @@ async function afhandelen(req, res, url) {
     if (!String(body.vraag || "").trim()) return { fout: "Geen vraag meegegeven" };
     const { xml } = docx.open(p.pad);
     const mail = await mailVoor(p, docx.headerVelden(xml));
+    let geldTekst = "";
+    try {
+      geldTekst = geldSamenvatting(geld.voorProject(p.naam, projecten()));
+    } catch (e) {
+      console.error(`[geld] ${e.message}`);
+    }
     const antwoord = await vraagClaude(
       vraagPrompt({
         projectNaam: p.naam,
+        geld: geldTekst,
         documentTekst: docx.documentTekst(xml),
         vraag: body.vraag,
         historie: body.historie,
@@ -455,6 +463,7 @@ async function afhandelen(req, res, url) {
     const body = await leesBody(req);
     const wijziging = {};
     if ("afgerond" in body) wijziging.afgerond = body.afgerond === null ? null : !!body.afgerond;
+    if ("status" in body) wijziging.status = body.status || null;
     if ("project" in body) {
       if (body.project === null || body.project === "-") wijziging.project = body.project;
       else {

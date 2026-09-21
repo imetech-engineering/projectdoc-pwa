@@ -167,6 +167,8 @@ fs.rmSync(map, { recursive: true, force: true });
   schrijfDocx(path.join(om, "OF260904_Lift Techniek_backup_260916.docx"), offerte("OF260904", "01-09-2026", "X", "X", [], "€ 1,00"));
   schrijfDocx(path.join(om, "OF260905_Jessica Aluwi.docx"), offerte("OF260905", "21-09-2026", "Jessica Aluwi", "Geurmodule", [["Onderzoek", "€ 2.320,00"]], "€ 2.320,00"));
   fs.writeFileSync(path.join(om, "Archief", "OF250101_Oud.pdf"), "%PDF-1.4");
+  schrijfDocx(path.join(om, "OF260908_Lift Techniek.docx"), offerte("OF260908", "20-09-2026", "Lift Techniek B.V.", "Liftprint serie 30", [["Materialen", "€ 3.100,00"]], "€ 3.100,00"));
+  schrijfDocx(path.join(om, "OF260801_Aluwi.docx"), offerte("OF260801", "01-08-2026", "Jessica Aluwi", "Onderhoud op regiebasis", [["Per uur", "€ 80,00"]], "€ 80,00"));
 
   // Mini-werkboek: Verkoopboek + Bankboek, met gedeelde strings zoals Excel dat doet.
   const strings = ["Factuurdatum", "Klant", "Omschrijving", "Factuurnr / Bon", "Bedrag incl. BTW (€)", "Netto (€)",
@@ -194,6 +196,22 @@ fs.rmSync(map, { recursive: true, force: true });
     onderdeel("xl/sharedStrings.xml", sst), onderdeel("xl/worksheets/sheet1.xml", bb), onderdeel("xl/worksheets/sheet2.xml", vk),
   ]));
 
+  // Urenadministratie met Ureninschattingen: Robot staat op Regie.
+  const uSst = ["Datum", "Opdrachtgever", "Project", "Status", "Aluwi", "5020 Robot", "Regie", "Lift Techniek", "5016 Liftprint", "In opdracht"];
+  const uSheet = `<worksheet><sheetData>
+    <row r="5">${c("A5", 0, 1)}${c("C5", 1, 1)}${c("D5", 2, 1)}${c("J5", 3, 1)}</row>
+    <row r="6">${c("A6", 46200)}${c("C6", 4, 1)}${c("D6", 5, 1)}${c("J6", 6, 1)}</row>
+    <row r="7">${c("A7", 46080)}${c("C7", 7, 1)}${c("D7", 8, 1)}${c("J7", 9, 1)}</row>
+  </sheetData></worksheet>`;
+  const um = path.join(bh, "04 Urenadministratie");
+  fs.mkdirSync(um, { recursive: true });
+  fs.writeFileSync(path.join(um, "urenadministratie_2025.xlsx"), schrijfZip([
+    onderdeel("xl/workbook.xml", `<workbook xmlns:r="r"><sheets><sheet name="Ureninschattingen" sheetId="3" r:id="rId3"/></sheets></workbook>`),
+    onderdeel("xl/_rels/workbook.xml.rels", `<Relationships><Relationship Id="rId3" Target="worksheets/sheet3.xml"/></Relationships>`),
+    onderdeel("xl/sharedStrings.xml", `<sst>${uSst.map((t) => `<si><t>${t}</t></si>`).join("")}</sst>`),
+    onderdeel("xl/worksheets/sheet3.xml", uSheet),
+  ]));
+
   const projectLijst = [
     { naam: "Liftprint", map: "5016 Liftprint", pad: projPad },
     { naam: "Robot", map: "5020 Robot", pad: anderPad },
@@ -202,17 +220,21 @@ fs.rmSync(map, { recursive: true, force: true });
   let r = g.voorProject("Liftprint", projectLijst);
   const o1 = r.offertes.find((o) => o.nummer === "OF260301");
   const o2 = r.offertes.find((o) => o.nummer === "OF260904");
-  check("offertes aan het juiste project gekoppeld", r.offertes.length === 2 && !!o1 && !!o2);
+  check("offertes aan het juiste project gekoppeld", r.offertes.length === 3 && !!o1 && !!o2);
   check("offerte-inhoud gelezen (regels, totaal, datum)", o2 && o2.regels.length === 2 && o2.totaalExcl === 3475 && o2.datum === "2026-09-16");
   check("backup-kopie van een offerte genegeerd", o2 && o2.klant === "Lift Techniek B.V.");
   check("facturen via projectnummer gekoppeld", r.facturen.length === 2);
   check("betaald volgt uit het Bankboek", r.facturen.find((f) => f.nummer === "FA260709").betaald && !r.facturen.find((f) => f.nummer === "FA260906").betaald);
   check("factuur hoort bij de oudste openstaande offerte", r.facturen.every((f) => f.offerte === "OF260301"));
-  check("restbetaling rondt de offerte af", o1.status === "afgerond" && o2.status === "open");
+  check("restbetaling rondt de offerte af", o1.status === "afgerond");
+  check("nieuwere offerte met hetzelfde onderwerp vervangt de oude", o2.status === "vervangen" && o2.vervangenDoor === "OF260908");
+  const o3 = r.offertes.find((o) => o.nummer === "OF260908");
+  check("in opdracht uit de urenadministratie", o3 && o3.status === "loopt" && o3.urenStatus === "In opdracht");
   check("pdf van factuur gevonden", r.facturen.find((f) => f.nummer === "FA260709").heeftBestand);
   check("oude offerte zonder project staat bij de losse", r.losseOffertes.length === 0 || r.losseOffertes.every((o) => o.nummer !== "OF260904"));
   const robot = g.voorProject("Robot", projectLijst);
-  check("klantnaam koppelt offerte aan ander project", robot.offertes.length === 1 && robot.offertes[0].nummer === "OF260905");
+  check("klantnaam koppelt offerte aan ander project", robot.offertes.length === 2 && robot.offertes.some((o) => o.nummer === "OF260905"));
+  check("regie in de urenadministratie maakt een offerte doorlopend", robot.offertes.every((o) => o.status === "doorlopend"));
   check("factuur zonder duidelijke klant blijft los", robot.facturen.length === 0 && robot.losseFacturen.some((f) => f.nummer === "FA260910"));
 
   g.zet("offerte", "OF260904", { afgerond: true });
@@ -221,7 +243,19 @@ fs.rmSync(map, { recursive: true, force: true });
   r = g.voorProject("Liftprint", projectLijst);
   check("handmatig afronden werkt", r.offertes.find((o) => o.nummer === "OF260904").status === "afgerond");
   check("factuur handmatig koppelen werkt", r.facturen.some((f) => f.nummer === "FA260910" && f.koppeling === "handmatig"));
-  check("offerte loskoppelen werkt", g.voorProject("Robot", projectLijst).offertes.length === 0);
+  check("offerte loskoppelen werkt", g.voorProject("Robot", projectLijst).offertes.length === 1);
+  g.zet("offerte", "OF260908", { status: "doorlopend" });
+  check("handmatig op doorlopend zetten", g.voorProject("Liftprint", projectLijst).offertes.find((o) => o.nummer === "OF260908").status === "doorlopend");
+  let fout = null;
+  try {
+    g.zet("offerte", "OF260908", { status: "raar" });
+  } catch (e) {
+    fout = e;
+  }
+  check("onbekende status geweigerd", !!fout);
+  const { samenvatting } = require("../lib/geld");
+  const sam = samenvatting(g.voorProject("Liftprint", projectLijst));
+  check("samenvatting voor Claude noemt offertes en betaald", /Offerte OF260301/.test(sam) && /FA260709.*betaald/.test(sam));
   g.zet("offerte", "OF260904", { afgerond: null });
   check("terug naar automatisch", g.voorProject("Liftprint", projectLijst).offertes.find((o) => o.nummer === "OF260904").status !== "afgerond");
   check("bestand zoeken blijft binnen de mappen", g.bestand("offerte", "../../x") === null && /OF260904_Lift Techniek\.docx$/.test(g.bestand("offerte", "of260904")));

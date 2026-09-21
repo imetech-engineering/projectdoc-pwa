@@ -156,11 +156,22 @@ function historieBlok(historie) {
 }
 
 /** Vraag over een project — puur lezen, geen wijzigingen. */
-function vraagPrompt({ projectNaam, documentTekst, vraag, historie, mail }) {
+function geldBlok(geld) {
+  if (!geld) return "";
+  return `
+
+<offertes_en_facturen bron="offertemap en boekhouding, bedragen excl. btw">
+${geld}
+</offertes_en_facturen>`;
+}
+
+function vraagPrompt({ projectNaam, documentTekst, vraag, historie, mail, geld }) {
   const d = vandaag();
   return `Je beantwoordt vragen over projectdocumentatie. Vandaag is ${d.iso}.
 
 Hieronder staat de volledige inhoud van het projectdocument "${projectNaam}", en soms recente mail uit het eigen postvak die bij het project hoort. Beantwoord de vraag daarop. Weet je het uit geen van beide, zeg dat dan gewoon. Komt het antwoord uit een mailbericht en niet uit het logboek, zeg er dan bij dat het uit de mail komt.
+
+Vragen over geld (wat is aangeboden, wat is gefactureerd, wat staat nog open, is er betaald) beantwoord je uit het blok met offertes en facturen; dat komt rechtstreeks uit de offertemap en de boekhouding en is leidend boven bedragen in het logboek.
 
 Vraagt hij of iets al verwerkt is, of wat er nog open staat, leg de mail dan naast het logboek: noem per bericht of het al in een entry terugkomt en zo ja in welke, en welke berichten nog nergens genoemd worden. Ga daarbij op de inhoud af, niet op de datum alleen — een bericht kan in een entry van een andere dag verwerkt zijn.
 
@@ -168,7 +179,7 @@ Antwoord in het Nederlands, kort en direct — dit wordt op een telefoon gelezen
 
 <projectdocument naam="${projectNaam}">
 ${documentTekst}
-</projectdocument>${mailBlok(mail)}${historieBlok(historie)}
+</projectdocument>${geldBlok(geld)}${mailBlok(mail)}${historieBlok(historie)}
 
 <vraag>
 ${vraag}

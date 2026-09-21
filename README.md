@@ -55,9 +55,15 @@ het Verkoopboek en Bankboek in `Boekhouding_IMeTech.xlsx` en de pdf's in
 `01 Verkoop facturen` (alleen lezen). Koppelen gaat op offertenummer in het
 projectdocument, projectnummer in de factuuromschrijving en klantnaam. Een
 offerte is afgerond zodra de facturen hem dekken of er een eind-/restfactuur
-is; afronden, heropenen en een ander project kiezen kan ook met de hand. Die
-keuzes staan in `bridge/data/geld_keuzes.json`. Andere mappen? Zet
-`offertesMap`, `facturenMap` of `boekhoudingPad` in `config.json`.
+is. De status in de Ureninschattingen van de urenadministratie telt mee: Regie
+wordt "Doorlopend", Afgerond wordt afgerond en Geannuleerd wordt "Vervallen".
+Een nieuwere offerte met hetzelfde onderwerp maakt de oude "Vervangen". Status
+en project kun je per offerte ook met de hand kiezen; die keuzes staan in
+`bridge/data/geld_keuzes.json`. Bij Afronden zet de app een korte logboek-entry
+klaar. PDF's open je in de app zelf (pdf.js), Word-bestanden via het deelmenu.
+In de Vragen-tab kent Claude de offertes, facturen en betaalstatus. Andere
+mappen? Zet `offertesMap`, `facturenMap`, `boekhoudingPad` of `urenPad` in
+`config.json`.
 
 **Vragen.** Stel vragen over het project ("wat staat er nog open?", "wat was er
 afgesproken over de levertijd?"). Antwoorden komen alleen uit het

@@ -18,6 +18,9 @@ const docx = require("./docx");
 
 const NR_OFFERTE = /\b((?:OF|PR)\d{6})\b/gi;
 const NR_FACTUUR = /\b((?:FA|CN)\d{6})\b/gi;
+// Alleen "echte" regie: materiaal op nacalculatie in een vaste-prijsofferte telt niet.
+const REGIE = /\b(regie|regiebasis|op uurbasis|per uur)\b/i;
+const STATUSSEN = ["open", "loopt", "doorlopend", "afgerond", "vervallen", "vervangen"];
 const EIND = /\b(eind|rest|slot|laatste termijn|oplevering)/i;
 const STOP = new Set([
   "engineering", "imetech", "solutions", "business", "holding", "group", "groep", "project", "projecten",
@@ -129,7 +132,10 @@ function kolommen(rijen, verplicht, wensen) {
     const r = Array.from(rijen[i] || [], (c) => (typeof c === "string" ? c.replace(/\s+/g, " ").trim().toLowerCase() : ""));
     if (!r.some((c) => c.startsWith(verplicht))) continue;
     const idx = {};
-    for (const [sleutel, begin] of Object.entries(wensen)) idx[sleutel] = r.findIndex((c) => c.startsWith(begin));
+    for (const [sleutel, begin] of Object.entries(wensen)) {
+      const exact = r.findIndex((c) => c === begin);
+      idx[sleutel] = exact >= 0 ? exact : r.findIndex((c) => c.startsWith(begin));
+    }
     return { kop: i, idx };
   }
   return null;
@@ -176,6 +182,35 @@ function leesBoekhouding(pad) {
   return { facturen, betaald };
 }
 
+/** Ureninschattingen uit de urenadministratie: per regel project en status (Regie, Afgerond, ...). */
+function leesUren(pad) {
+  const rijen = (leesXlsx(pad, ["Ureninschattingen"])["Ureninschattingen"]) || [];
+  const k = kolommen(rijen, "project", { datum: "datum", og: "opdrachtgever", project: "project", status: "status" });
+  if (!k) return [];
+  const uit = [];
+  for (const r of rijen.slice(k.kop + 1)) {
+    if (!r || !r[k.idx.project]) continue;
+    const d = r[k.idx.datum];
+    uit.push({
+      datum: typeof d === "number" ? serieelNaarIso(d) : nlDatum(d) || null,
+      opdrachtgever: String(r[k.idx.og] || "").trim(),
+      project: String(r[k.idx.project]).trim(),
+      status: String(r[k.idx.status] || "").trim(),
+    });
+  }
+  return uit;
+}
+
+/** Hoeveel woorden twee omschrijvingen delen, als fractie (0..1). */
+function gelijkenis(a, b) {
+  const A = new Set(tokens(a));
+  const B = new Set(tokens(b));
+  if (!A.size || !B.size) return 0;
+  let n = 0;
+  for (const t of A) if (B.has(t)) n++;
+  return n / Math.min(A.size, B.size);
+}
+
 /* --------------------------------------------------------------- offertes */
 
 function lijstBestanden(map, re, diepte = 0) {
@@ -202,7 +237,8 @@ function lijstBestanden(map, re, diepte = 0) {
 function leesOfferteDocx(pad) {
   const { xml } = docx.open(pad);
   const { kinderen } = docx.bodyKinderen(xml);
-  const uit = { klant: "", onderwerp: "", referentie: "", datum: null, geldigheid: "", regels: [], totaalExcl: null, totaalIncl: null };
+  const uit = { klant: "", onderwerp: "", referentie: "", datum: null, geldigheid: "", regels: [], totaalExcl: null, totaalIncl: null, regie: false };
+  const volledigeTekst = docx.documentTekst(xml);
   for (const kind of kinderen) {
     if (kind.naam === "w:p") {
       const t = docx.alineaTekst(kind.xml).trim();
@@ -236,6 +272,11 @@ function leesOfferteDocx(pad) {
       else if ((c[0] || "").trim() && bedrag(laatste) != null) uit.regels.push({ omschrijving: c[0].trim(), bedrag: bedrag(laatste) });
     }
   }
+  // Regie als de prijsregels of het onderwerp het zeggen, of als er geen totaal is
+  // en de tekst het over uren/regie heeft.
+  uit.regie =
+    REGIE.test(`${uit.onderwerp} ${uit.referentie} ${uit.regels.map((r) => r.omschrijving).join(" ")}`) ||
+    (uit.totaalExcl == null && REGIE.test(volledigeTekst));
   return uit;
 }
 
@@ -263,8 +304,18 @@ function beste(scores) {
   return lijst[0];
 }
 
-function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, keuzesPad }) {
+function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, urenPad, keuzesPad }) {
   const basis = path.dirname(projectenMap);
+  const urenMap = path.join(basis, "02 Boekhouding", "04 Urenadministratie");
+  const zoekUrenPad = () => {
+    if (urenPad) return urenPad;
+    try {
+      const kandidaten = fs.readdirSync(urenMap).filter((n) => /^urenadministratie.*\.xlsx$/i.test(n) && !n.startsWith("~$")).sort();
+      return kandidaten.length ? path.join(urenMap, kandidaten[kandidaten.length - 1]) : null;
+    } catch (_) {
+      return null;
+    }
+  };
   offertesMap = offertesMap || path.join(basis, "03 Offertes");
   facturenMap = facturenMap || path.join(basis, "02 Boekhouding", "01 Verkoop facturen");
   boekhoudingPad = boekhoudingPad || path.join(basis, "02 Boekhouding", "Boekhouding_IMeTech.xlsx");
@@ -336,6 +387,7 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, keuz
         regels: inhoud.regels || [],
         totaalExcl: inhoud.totaalExcl ?? null,
         totaalIncl: inhoud.totaalIncl ?? null,
+        regie: !!inhoud.regie,
         heeftPdf: !!o.pdf,
         heeftDocx: !!o.docx,
         _pad: (o.pdf || o.docx).pad,
@@ -359,8 +411,12 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, keuz
         .filter((h) => /projectnummer|contact|bedrijf|eindklant|opdrachtgever|klant/i.test(h.label))
         .map((h) => h.waarde)
         .join(" ");
+      const mapDatum = /^(\d{2})(\d{2})(\d{2})\s/.exec(p.map);
+      const startVeld = (header.find((h) => /^start/i.test(h.label)) || {}).waarde || "";
+      const startM = /(20\d{2})-(\d{2})/.exec(startVeld);
       return {
         naam: p.naam,
+        start: mapDatum ? `20${mapDatum[1]}-${mapDatum[2]}-${mapDatum[3]}` : startM ? `${startM[1]}-${startM[2]}-01` : null,
         nummer: (/^(\d{4})\b/.exec(p.map) || [])[1] || null,
         klantTekst: plat(`${rel} ${velden}`),
         naamTekst: `${p.naam} ${p.map}`,
@@ -371,6 +427,9 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, keuz
   }
 
   let resultaat = null; // { tijd, data }
+
+  /** Alleen op klantnaam koppelen als het stuk niet ruim van vóór de projectstart is. */
+  const teOud = (p, datum) => p.start && datum && new Date(datum) < new Date(new Date(p.start).getTime() - 60 * 86400000);
 
   function bereken(alleProjecten) {
     if (resultaat && Date.now() - resultaat.tijd < 20000) return resultaat.data;
@@ -392,6 +451,7 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, keuz
         if (p.offertesInDoc.has(o.nummer)) s += 100;
         if (klantPast(o.klant, p.klantTekst)) s += 10;
         s += 5 * Math.min(3, overlap(`${o.onderwerp} ${o.referentie}`, p.naamTekst, new Set(tokens(o.klant))));
+        if (s < 100 && teOud(p, o.datum)) s = 0;
         return { p, score: s };
       });
       const b = beste(scores);
@@ -416,6 +476,7 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, keuz
         if (ofs.some((o) => o.project === p.naam && genoemd.has(o.nummer))) s += 50;
         if (klantPast(f.klant, p.klantTekst)) s += 10;
         s += 5 * Math.min(3, overlap(f.omschrijving, p.naamTekst, new Set(tokens(f.klant))));
+        if (s < 50 && teOud(p, f.datum)) s = 0;
         return { p, score: s };
       });
       const b = beste(scores);
@@ -459,14 +520,82 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, keuz
       keuze.facturen.push(f.nummer);
       if (EIND.test(f.omschrijving)) keuze.eindfactuur = f.nummer;
     }
+    // Ureninschattingen koppelen aan projecten (projectnummer, anders naam).
+    const urenBestand = zoekUrenPad();
+    const uren = (urenBestand && gecached(urenBestand, leesUren)) || [];
+    const urenPerProject = new Map();
+    for (const r of uren) {
+      const nr = (/^(\d{4})\b/.exec(r.project) || [])[1];
+      let p = nr ? infos.find((x) => x.nummer === nr) : null;
+      if (!p) {
+        const naam = r.project.replace(/^(\d{4,6}|x{3,4})\s+/i, "");
+        const kand = infos.filter((x) => overlap(naam, x.naamTekst) > 0);
+        if (kand.length === 1) p = kand[0];
+      }
+      if (p) (urenPerProject.get(p.naam) || urenPerProject.set(p.naam, []).get(p.naam)).push(r);
+    }
+    const dagVerschil = (a, b) => (a && b ? Math.abs(dag(a) - dag(b)) / 86400000 : 999);
+    function urenRegel(o) {
+      const rijen = urenPerProject.get(o.project) || [];
+      if (rijen.length <= 1) return rijen[0] || null;
+      const omschr = `${o.onderwerp} ${o.referentie} ${o.regels.map((r) => r.omschrijving).join(" ")}`;
+      return rijen
+        .map((r) => {
+          const d = dagVerschil(r.datum, o.datum);
+          return { r, s: overlap(r.project.replace(/^\S+\s+/, ""), omschr) + (d <= 7 ? 5 : d <= 31 ? 2 : 0) };
+        })
+        .sort((a, b) => b.s - a.s)[0].r;
+    }
+
+    // Een nieuwere offerte met (bijna) hetzelfde onderwerp vervangt de oudere,
+    // zolang op die oudere nog niets gefactureerd is.
+    const vervangenDoor = new Map();
+    for (const lijst of perProject.values()) {
+      const opDatum = [...lijst].sort((a, b) => a.datum.localeCompare(b.datum));
+      for (let i = 0; i < opDatum.length; i++) {
+        const oud = opDatum[i];
+        if (oud.gefactureerd > 0) continue;
+        const nieuwer = opDatum
+          .slice(i + 1)
+          .find(
+            (n) =>
+              dag(n.datum) - dag(oud.datum) <= 180 * 86400000 &&
+              gelijkenis(`${oud.onderwerp} ${oud.referentie}`, `${n.onderwerp} ${n.referentie}`) >= 0.5
+          );
+        if (nieuwer) vervangenDoor.set(oud.nummer, nieuwer.nummer);
+      }
+    }
+
+    const HANDMATIG = {
+      open: "Door jou op open gezet",
+      doorlopend: "Door jou op doorlopend gezet",
+      afgerond: "Door jou afgerond",
+      vervallen: "Door jou op vervallen gezet",
+    };
     for (const o of ofs) {
       const keuze = k.offertes[o.nummer] || {};
       o.gefactureerd = Math.round(o.gefactureerd * 100) / 100;
-      if (keuze.afgerond === true) Object.assign(o, { status: "afgerond", reden: "Door jou afgerond", handmatig: true });
-      else if (keuze.afgerond === false) Object.assign(o, { status: o.gefactureerd > 0 ? "loopt" : "open", reden: "Door jou heropend", handmatig: true });
-      else if (o.eindfactuur) Object.assign(o, { status: "afgerond", reden: `Eindfactuur ${o.eindfactuur}` });
-      else if (o.totaalExcl && o.gefactureerd >= o.totaalExcl * 0.98) Object.assign(o, { status: "afgerond", reden: "Volledig gefactureerd" });
-      else Object.assign(o, { status: o.gefactureerd > 0 ? "loopt" : "open", reden: o.gefactureerd > 0 ? "Deels gefactureerd" : "Nog niets gefactureerd" });
+      const handStatus = keuze.status || (keuze.afgerond === true ? "afgerond" : keuze.afgerond === false ? "open" : null);
+      const regel = o.project ? urenRegel(o) : null;
+      o.urenStatus = regel ? regel.status : null;
+      const us = (o.urenStatus || "").toLowerCase();
+      const gedekt = o.totaalExcl && o.gefactureerd >= o.totaalExcl * 0.98;
+      const zet = (status, reden, extra = {}) => Object.assign(o, { status, reden, ...extra });
+      if (handStatus) {
+        const st = handStatus === "open" && o.gefactureerd > 0 ? "loopt" : handStatus;
+        zet(st, HANDMATIG[handStatus] || "Door jou aangepast", { handmatig: true });
+      } else if (us === "geannuleerd") zet("vervallen", "Geannuleerd in de urenadministratie");
+      else if (us === "afgerond") zet("afgerond", "Afgerond in de urenadministratie");
+      else if (us === "regie") zet("doorlopend", "Op regie in de urenadministratie");
+      else if (o.eindfactuur) zet("afgerond", `Eindfactuur ${o.eindfactuur}`);
+      else if (gedekt) zet("afgerond", "Volledig gefactureerd");
+      else if (vervangenDoor.has(o.nummer)) zet("vervangen", `Vervangen door ${vervangenDoor.get(o.nummer)}`, { vervangenDoor: vervangenDoor.get(o.nummer) });
+      else if (o.regie) zet("doorlopend", "Offerte op regiebasis");
+      else if (us === "in opdracht") zet("loopt", o.gefactureerd > 0 ? "In opdracht, deels gefactureerd" : "In opdracht, nog niets gefactureerd");
+      else if (us === "on hold") zet(o.gefactureerd > 0 ? "loopt" : "open", "On hold in de urenadministratie");
+      else if (us === "wachten op akkoord") zet("open", "Wacht op akkoord");
+      else zet(o.gefactureerd > 0 ? "loopt" : "open", o.gefactureerd > 0 ? "Deels gefactureerd" : "Nog niets gefactureerd");
+      o.handmatig = !!handStatus;
       delete o.eindfactuur;
     }
     const data = { ofs, facturen };
@@ -509,7 +638,14 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, keuz
     const k = keuzes();
     const bak = soort === "offerte" ? k.offertes : k.facturen;
     const huidig = { ...(bak[nr] || {}) };
-    for (const veld of ["afgerond", "project"]) {
+    if ("status" in wijziging) {
+      delete huidig.afgerond;
+      if (wijziging.status !== null && !STATUSSEN.includes(wijziging.status)) throw new Error("Onbekende status");
+    }
+    if ("afgerond" in wijziging) {
+      delete huidig.status;
+    }
+    for (const veld of ["afgerond", "project", "status"]) {
       if (!(veld in wijziging)) continue;
       if (wijziging[veld] === null) delete huidig[veld];
       else huidig[veld] = wijziging[veld];
@@ -534,4 +670,20 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, keuz
   return { voorProject, zet, bestand, _intern: { bereken } };
 }
 
-module.exports = { maakGeld, leesXlsx, leesOfferteDocx, klantPast, tokens, bedrag, leesBoekhouding };
+/** Korte samenvatting voor Claude (vragen-tab). */
+function samenvatting(g) {
+  const eur = (n) => (n == null ? "?" : "€ " + Number(n).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  const regels = [];
+  for (const o of g.offertes || []) {
+    regels.push(
+      `- Offerte ${o.nummer} (${o.datum}, ${o.onderwerp || o.referentie || "zonder onderwerp"}): ${eur(o.totaalExcl)} excl. btw, status ${o.status} (${o.reden}), gefactureerd ${eur(o.gefactureerd)}` +
+        (o.regels && o.regels.length ? `; regels: ${o.regels.map((r) => `${r.omschrijving} ${eur(r.bedrag)}`).join("; ")}` : "")
+    );
+  }
+  for (const f of g.facturen || []) {
+    regels.push(`- Factuur ${f.nummer} (${f.datum}, ${f.omschrijving || "-"}): ${eur(f.netto)} excl. btw, ${f.betaald ? `betaald${f.betaaldOp ? " op " + f.betaaldOp : ""}` : "nog niet betaald"}${f.offerte ? `, hoort bij ${f.offerte}` : ""}`);
+  }
+  return regels.join("\n");
+}
+
+module.exports = { maakGeld, leesXlsx, leesOfferteDocx, leesUren, klantPast, tokens, bedrag, leesBoekhouding, samenvatting, gelijkenis };

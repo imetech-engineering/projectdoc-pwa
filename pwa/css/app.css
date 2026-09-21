@@ -908,8 +908,9 @@ body:has(.invoer-sticky-bar:not(.hidden)) #toast, body:has(.install-banner:not(.
 .btn-mini .ic { width: 17px; height: 17px; }
 .btn-mini:disabled { opacity: 0.5; }
 .gb-knoppen { display: flex; gap: 8px; margin-top: 10px; }
-.gb-knoppen .btn-primary, .gb-knoppen .btn-secondary { flex: 1; min-height: 36px; gap: 6px; }
-.gb-knoppen .btn-mini { width: 40px; height: auto; }
+.gb-knoppen { align-items: center; }
+.gb-knoppen .btn-primary, .gb-knoppen .btn-secondary { flex: 0 0 auto; height: 40px; min-height: 40px; font-size: 0.875rem; padding: 6px 14px; gap: 6px; display: inline-flex; align-items: center; justify-content: center; }
+.gb-knoppen .btn-mini { width: 40px; height: 40px; }
 .gb-knoppen .ic { width: 16px; height: 16px; }
 .gb-afgerond, .gb-toevoegen { margin-bottom: 10px; }
 .gb-afgerond > summary, .gb-toevoegen > summary {
@@ -924,3 +925,58 @@ body:has(.invoer-sticky-bar:not(.hidden)) #toast, body:has(.install-banner:not(.
 .gb-sub { margin: 6px 0 2px; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-tertiary); }
 .gb-los .btn-compact { min-height: 34px; padding: 6px 12px; }
 .kiezer-bijzonder { border-style: dashed; }
+
+/* extra statussen */
+.pil.doorlopend { color: var(--accent); background: transparent; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.pil.vervallen, .pil.vervangen { color: var(--text-tertiary); background: var(--bg-tertiary); }
+.offerte-knop.doorlopend > .ic:first-child { color: var(--accent); }
+.offerte-knop.doorlopend .pil { color: var(--accent); background: transparent; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.gb-kaart.vervallen, .gb-kaart.vervangen { opacity: 0.75; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.status-kies { position: relative; flex: 1 1 0; min-width: 0; display: flex; }
+.status-kies select {
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 26px 6px 10px;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  appearance: none;
+  -webkit-appearance: none;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.status-kies::after {
+  content: "";
+  position: absolute;
+  right: 11px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-top: -5px;
+  border-right: 1.5px solid var(--text-tertiary);
+  border-bottom: 1.5px solid var(--text-tertiary);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+/* pdf-viewer */
+.pdf-overlay { position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column; background: var(--bg-secondary); }
+.pdf-kop {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(8px + var(--safe-top)) 10px 8px 14px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+}
+.pdf-kop h2 { flex: 1; min-width: 0; margin: 0; font-size: 0.9375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pdf-zoom { font-variant-numeric: tabular-nums; font-size: 0.8125rem; color: var(--text-secondary); min-width: 38px; text-align: center; }
+.pdf-pagina-s { flex: 1; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; padding: 10px 10px calc(16px + var(--safe-bottom)); }
+.pdf-pagina-s canvas { display: block; margin: 0 auto 10px; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18); border-radius: 2px; }
+.pdf-laden { padding: 40px 16px; text-align: center; color: var(--text-secondary); font-size: 0.875rem; }
