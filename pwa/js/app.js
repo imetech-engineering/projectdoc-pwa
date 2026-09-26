@@ -683,7 +683,10 @@
           .join("")}</details>`
       );
     if (los.length)
-      delen.push(`<h3 class="gb-sectie">Facturen zonder offerte</h3><div class="gb-kaart los">${los.map(factuurRijHtml).join("")}</div>`);
+      delen.push(
+        `<h3 class="gb-sectie">${los.every((f) => f.meerwerk) ? "Meerwerk" : "Facturen zonder offerte"}</h3>` +
+          `<div class="gb-kaart los">${los.map(factuurRijHtml).join("")}</div>`
+      );
     const losO = g.losseOffertes || [];
     const losF = g.losseFacturen || [];
     if (losO.length || losF.length) {

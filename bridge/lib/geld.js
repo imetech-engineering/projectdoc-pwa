@@ -24,6 +24,8 @@ const PLATFORMS = new Set(["fiverr", "upwork", "freelancer", "malt", "werkspot"]
 const REGIE = /\b(regie|regiebasis|op uurbasis|per uur)\b/i;
 const STATUSSEN = ["open", "loopt", "doorlopend", "afgerond", "vervallen", "vervangen"];
 const EIND = /\b(eind|rest|slot|laatste termijn|oplevering)/i;
+// Meerwerk: werk buiten de offerte. Zo'n factuur hoort niet bij een offerte (geen termijn ervan).
+const MEERWERK = /\b(meerwerk|extra werk|extra werkzaamheden|aanvullend\w*|additione\w*)\b/i;
 const STOP = new Set([
   "engineering", "imetech", "solutions", "business", "holding", "group", "groep", "project", "projecten",
   "klanten", "the", "and", "van", "voor", "met", "het", "een", "der", "den", "bij", "nl", "bv", "b", "v",
@@ -543,6 +545,12 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, uren
       if (!kand.length) continue;
       const genoemd = alleNummers(f.omschrijving, NR_OFFERTE);
       let keuze = kand.find((o) => genoemd.has(o.nummer));
+      // Meerwerk, of alles uit de offertes is al gefactureerd: dan is dit extra werk en geen termijn.
+      const allesAlGefactureerd = kand.every((o) => o.totaalExcl && o.gefactureerd >= o.totaalExcl * 0.98);
+      if (!keuze && !f.gecrediteerd && (MEERWERK.test(f.omschrijving) || allesAlGefactureerd)) {
+        f.meerwerk = true;
+        continue;
+      }
       if (!keuze) {
         const netto = Math.abs(f.netto || 0);
         const gescoord = kand.map((o, i) => {
@@ -678,16 +686,34 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, uren
    * projectNummer is het nummer van de projectmap waar de offerte aan hangt (bv. "5016").
    */
   function alleOffertes(alleProjecten) {
-    const { ofs } = bereken(alleProjecten);
+    return offertesEnMeerwerk(alleProjecten).offertes;
+  }
+
+  /**
+   * Voor de uren-app: offertes (met regels) plus de facturen die niet bij een offerte horen
+   * (meerwerk). Termijnfacturen van een offerte blijven weg: die zitten al in het offertebedrag.
+   */
+  function offertesEnMeerwerk(alleProjecten) {
+    const { ofs, facturen } = bereken(alleProjecten);
     const nummerVan = new Map(alleProjecten.map((p) => [p.naam, (/^(\d{4})\b/.exec(p.map || "") || [])[1] || null]));
     const grens = new Date(Date.now() - 2 * 365 * 86400000).toISOString().slice(0, 10);
-    return ofs
-      .filter((o) => (o.datum || "") >= grens)
-      .sort((a, b) => b.datum.localeCompare(a.datum))
-      .map(({ nummer, datum, klant, onderwerp, referentie, regels, totaalExcl, regie, project, status }) => ({
-        nummer, datum, klant, onderwerp, referentie, regels, totaalExcl, regie, project, status,
-        projectNummer: (project && nummerVan.get(project)) || null,
-      }));
+    const nr = (project) => (project && nummerVan.get(project)) || null;
+    return {
+      offertes: ofs
+        .filter((o) => (o.datum || "") >= grens)
+        .sort((a, b) => b.datum.localeCompare(a.datum))
+        .map(({ nummer, datum, klant, onderwerp, referentie, regels, totaalExcl, regie, project, status }) => ({
+          nummer, datum, klant, onderwerp, referentie, regels, totaalExcl, regie, project, status,
+          projectNummer: nr(project),
+        })),
+      meerwerk: facturen
+        .filter((f) => f.project && !f.offerte && !f.gecrediteerd && (f.netto || 0) > 0 && (f.datum || "") >= grens)
+        .sort((a, b) => b.datum.localeCompare(a.datum))
+        .map(({ nummer, datum, klant, omschrijving, netto, project, meerwerk }) => ({
+          nummer, datum, klant, omschrijving, netto, project, meerwerk: !!meerwerk,
+          projectNummer: nr(project),
+        })),
+    };
   }
 
   /** afgerond: true/false/null (null = weer automatisch); project: naam, "-" (geen) of null (weer automatisch). */
@@ -727,7 +753,7 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, uren
     return factuurBestand(nr);
   }
 
-  return { voorProject, alleOffertes, zet, bestand, _intern: { bereken } };
+  return { voorProject, alleOffertes, offertesEnMeerwerk, zet, bestand, _intern: { bereken } };
 }
 
 /** Korte samenvatting voor Claude (vragen-tab). */

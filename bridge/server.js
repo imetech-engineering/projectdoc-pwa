@@ -26,7 +26,7 @@ const { gekoppeld: mailGekoppeld } = require("./lib/graph");
 const { vraagPrompt, voorstelPrompt, SCHEMA_VOORSTEL } = require("./lib/prompts");
 const { maakGeld, samenvatting: geldSamenvatting } = require("./lib/geld");
 
-const VERSIE = "1.13.0";
+const VERSIE = "1.14.0";
 const MAX_BODY = 2 * 1024 * 1024;
 const CONFIG_PAD = process.env.PROJECTDOC_CONFIG || path.join(__dirname, "config.json");
 
@@ -459,9 +459,9 @@ async function afhandelen(req, res, url) {
     return geld.voorProject(p.naam, projecten());
   }
 
-  // Voor de uren-app: alle recente offertes met regels, om het urendeel van een vaste prijs te kiezen.
+  // Voor de uren-app: recente offertes met regels plus meerwerkfacturen, voor het tarief bij een vaste prijs.
   if (pad === "/api/offertes" && req.method === "GET") {
-    return { offertes: geld.alleOffertes(projecten()) };
+    return geld.offertesEnMeerwerk(projecten());
   }
 
   if (pad === "/api/geld/zet" && req.method === "POST") {
