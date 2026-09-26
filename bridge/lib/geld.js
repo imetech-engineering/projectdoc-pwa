@@ -672,6 +672,24 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, uren
     };
   }
 
+  /**
+   * Alle offertes van de laatste twee jaar, met de regels, voor de uren-app: die
+   * rekent bij een vaste prijs het uurtarief uit (urendeel van de offerte ÷ gemaakte uren).
+   * projectNummer is het nummer van de projectmap waar de offerte aan hangt (bv. "5016").
+   */
+  function alleOffertes(alleProjecten) {
+    const { ofs } = bereken(alleProjecten);
+    const nummerVan = new Map(alleProjecten.map((p) => [p.naam, (/^(\d{4})\b/.exec(p.map || "") || [])[1] || null]));
+    const grens = new Date(Date.now() - 2 * 365 * 86400000).toISOString().slice(0, 10);
+    return ofs
+      .filter((o) => (o.datum || "") >= grens)
+      .sort((a, b) => b.datum.localeCompare(a.datum))
+      .map(({ nummer, datum, klant, onderwerp, referentie, regels, totaalExcl, regie, project, status }) => ({
+        nummer, datum, klant, onderwerp, referentie, regels, totaalExcl, regie, project, status,
+        projectNummer: (project && nummerVan.get(project)) || null,
+      }));
+  }
+
   /** afgerond: true/false/null (null = weer automatisch); project: naam, "-" (geen) of null (weer automatisch). */
   function zet(soort, nummer, wijziging) {
     const nr = String(nummer || "").toUpperCase();
@@ -709,7 +727,7 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, uren
     return factuurBestand(nr);
   }
 
-  return { voorProject, zet, bestand, _intern: { bereken } };
+  return { voorProject, alleOffertes, zet, bestand, _intern: { bereken } };
 }
 
 /** Korte samenvatting voor Claude (vragen-tab). */
