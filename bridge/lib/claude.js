@@ -153,7 +153,35 @@ function omgeving() {
   const env = { ...process.env, CLAUDE_CODE_ENTRYPOINT: "projectdoc-bridge" };
   delete env.CLAUDECODE;
   delete env.CLAUDE_CODE_SSE_PORT;
+  const token = leesToken();
+  if (token) env.CLAUDE_CODE_OAUTH_TOKEN = token;
   return env;
+}
+
+/**
+ * Het vaste token van Koppel-Claude.cmd (claude setup-token, een jaar geldig).
+ *
+ * De gewone login van Claude Code kan verlopen, en de bridge draait onbeheerd.
+ * Het bestand staat bewust buiten de projectmap: die zit in OneDrive en een
+ * sleutel hoort niet mee te synchroniseren. We lezen het bij elke aanroep,
+ * zodat een nieuw token meteen werkt. Geen bestand: dan de gewone login.
+ */
+function tokenPad() {
+  return path.join(process.env.LOCALAPPDATA || os.homedir(), "projectdoc-bridge", "claude-token.txt");
+}
+
+function leesToken() {
+  try {
+    return fs.readFileSync(tokenPad(), "utf8").trim();
+  } catch (_) {
+    return "";
+  }
+}
+
+/** Een inlogfout zegt niet wat je eraan kunt doen; dat zetten we erachter. */
+function metUitleg(melding) {
+  if (!/authenticat|oauth|\/login|not logged in|invalid.*(api key|token)/i.test(melding)) return melding;
+  return `${melding}. Dubbelklik op de pc op bridge\\Koppel-Claude.cmd om Claude opnieuw te koppelen.`;
 }
 
 /** Lege werkmap: Claude heeft hier niets te lezen, alle context komt uit de prompt. */
@@ -225,7 +253,7 @@ function vraagClaude(prompt, opties = {}) {
     kind.on("close", (code) => {
       clearTimeout(klok);
       if (!uit.trim()) {
-        reject(new Error(fout.trim() || `Claude stopte met code ${code} zonder antwoord`));
+        reject(new Error(metUitleg(fout.trim() || `Claude stopte met code ${code} zonder antwoord`)));
         return;
       }
       let json;
@@ -236,7 +264,7 @@ function vraagClaude(prompt, opties = {}) {
         return;
       }
       if (json.is_error) {
-        reject(new Error(json.result || "Claude gaf een fout terug"));
+        reject(new Error(metUitleg(String(json.result || "Claude gaf een fout terug"))));
         return;
       }
       resolve({
@@ -293,4 +321,4 @@ async function zelftest(opties = {}) {
   return tekst.trim().toLowerCase().includes("ok");
 }
 
-module.exports = { vraagClaude, vraagJson, zelftest, zoekClaude, startwijze };
+module.exports = { vraagClaude, vraagJson, zelftest, zoekClaude, startwijze, leesToken, metUitleg, omgeving };

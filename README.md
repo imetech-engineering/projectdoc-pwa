@@ -142,6 +142,15 @@ inloggegevens uit je gebruikersprofiel, en daar kan een dienst zonder
 aangemeld account niet bij. Logt je pc automatisch in na een herstart, dan komt
 het op hetzelfde neer.
 
+Claude koppelen met een vast token: dubbelklik op `bridge\Koppel-Claude.cmd`.
+De gewone login van Claude Code kan verlopen; dit token blijft een jaar geldig.
+Keur de login goed in de browser en kopieer het token (begint met `sk-ant-oat`).
+De rest gaat vanzelf: het token testen, opslaan in
+`%LOCALAPPDATA%\projectdoc-bridge\claude-token.txt` (bewust buiten OneDrive), de
+bridge herstarten en controleren of Claude reageert. Het verslag staat in
+`koppel.log` in dezelfde map, zonder het token. Verloopt het token of krijg je
+een inlogfout in de app, dan dubbelklik je hem gewoon opnieuw.
+
 Controleren of het docx-werk klopt, zonder internet of Claude:
 
 ```

@@ -280,5 +280,21 @@ fs.rmSync(map, { recursive: true, force: true });
   fs.rmSync(od, { recursive: true, force: true });
 }
 
+/* ------------------------------------------------------- koppeling met Claude */
+{
+  const { leesToken, metUitleg, omgeving } = require("../lib/claude");
+  const oud = process.env.LOCALAPPDATA;
+  const tm = fs.mkdtempSync(path.join(os.tmpdir(), "koppel-"));
+  process.env.LOCALAPPDATA = tm;
+  check("geen tokenbestand: gewone login", leesToken() === "" && !("CLAUDE_CODE_OAUTH_TOKEN" in omgeving() && omgeving().CLAUDE_CODE_OAUTH_TOKEN !== process.env.CLAUDE_CODE_OAUTH_TOKEN));
+  fs.mkdirSync(path.join(tm, "projectdoc-bridge"));
+  fs.writeFileSync(path.join(tm, "projectdoc-bridge", "claude-token.txt"), "sk-ant-oat01-test\n");
+  check("token komt in de omgeving, zonder witregel", omgeving().CLAUDE_CODE_OAUTH_TOKEN === "sk-ant-oat01-test");
+  check("inlogfout krijgt uitleg", /Koppel-Claude\.cmd/.test(metUitleg("Failed to authenticate: OAuth session expired and could not be refreshed")));
+  check("andere fout blijft ongemoeid", metUitleg("Claude reageerde niet") === "Claude reageerde niet");
+  if (oud === undefined) delete process.env.LOCALAPPDATA; else process.env.LOCALAPPDATA = oud;
+  fs.rmSync(tm, { recursive: true, force: true });
+}
+
 console.log(`\n${mislukt ? `${mislukt} controle(s) mislukt` : "Alles in orde"}`);
 process.exit(mislukt ? 1 : 0);
