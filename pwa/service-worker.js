@@ -1,4 +1,4 @@
-const CACHE = "imtech-projectdoc-v32";
+const CACHE = "imtech-projectdoc-v33";
 const ASSETS = [
   "./",
   "./index.html", "./css/imetech-ui.css", "./js/imetech-ui.js",
