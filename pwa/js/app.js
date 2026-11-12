@@ -1831,10 +1831,10 @@
     $("btn-voorstel-weg").addEventListener("click", gooiVoorstelWeg);
 
     $("btn-vraag").addEventListener("click", stelVraag);
-    $("btn-gesprek-wis").addEventListener("click", () => {
+    $("btn-gesprek-wis").addEventListener("click", async () => {
       if (!state.project) return toast("Kies eerst een project.");
       if (!state.gesprek.length) return toast("Er is nog geen gesprek om te wissen.");
-      if (!confirm("Het gesprek over dit project wissen?")) return;
+      if (!(await IMeTechUI.bevestig("Gesprek wissen?", { tekst: "Het gesprek over dit project verdwijnt van dit apparaat.", ok: "Wissen", gevaar: true }))) return;
       state.gesprek = [];
       Opslag.wisGesprek(state.project);
       tekenGesprek();
@@ -1860,8 +1860,8 @@
       Spraak.spreek("Zo klink ik.", $("cfg-stem").value);
     });
     $("btn-update").addEventListener("click", zoekNieuweVersie);
-    $("btn-wis-lokaal").addEventListener("click", () => {
-      if (!confirm("Alle lokale instellingen, concepten en gesprekken wissen?")) return;
+    $("btn-wis-lokaal").addEventListener("click", async () => {
+      if (!(await IMeTechUI.bevestig("Alles op dit apparaat wissen?", { tekst: "Instellingen, concepten en gesprekken verdwijnen van dit apparaat.", ok: "Alles wissen", gevaar: true }))) return;
       Opslag.wisAlles();
       location.reload();
     });
