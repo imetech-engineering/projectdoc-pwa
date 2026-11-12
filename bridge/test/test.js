@@ -296,5 +296,38 @@ fs.rmSync(map, { recursive: true, force: true });
   fs.rmSync(tm, { recursive: true, force: true });
 }
 
+/* ------------------------------------------------------- markdown-projectdocs */
+{
+  const md = require("../lib/md");
+  const projectdoc = require("../lib/projectdoc");
+  const tm = fs.mkdtempSync(path.join(os.tmpdir(), "md-"));
+  const pad = path.join(tm, "Project Test.md");
+  projectdoc.maakNieuw(pad, { titel: "Test", header: { Project: "Test", Projectnummer: "5099", Status: "Wachten op akkoord" } });
+  let doc = projectdoc.open(pad);
+  check("md: nieuw document heeft kopvelden", doc.header().find((h) => h.label === "Status").waarde === "Wachten op akkoord");
+  check("md: nieuw document heeft lege bestellingen", doc.bestellingen().length === 0 && /## Bestellingen/.test(doc.tekst()));
+  doc.voegEntryToe({ kop: "261101  Kickoff", alineas: ["Gesprek met klant."], secties: [{ kop: "Acties IM", punten: ["offerte maken"] }] });
+  doc.voegEntryToe({ kop: "261112 Onderdelen besteld", alineas: ["Bij Mouser."], secties: [] });
+  check("md: kopwaarde met dubbele punt", doc.zetHeader("Status", "In opdracht: fase 1") && doc.zetHeader("Gemaakte uren", "3,5"));
+  doc.voegBestellingToe({ datum: "261112", leverancier: "Mouser", ordernr: "M1|2", wat: "connectoren", bedrag: "€ 12", status: "besteld" });
+  doc.bewaar();
+  doc = projectdoc.open(pad);
+  const e = doc.entries();
+  check("md: entries nieuwste eerst", e.length === 2 && e[0].datum === "261112" && e[0].kop === "Onderdelen besteld");
+  check("md: sectiekop en punt herkend", e[1].blokken.some((b) => b.soort === "kop" && /Acties IM/.test(b.tekst)) && e[1].blokken.some((b) => b.soort === "punt" && b.tekst === "offerte maken"));
+  check("md: kopgegevens bewaard", doc.header().find((h) => h.label === "Status").waarde === "In opdracht: fase 1" && doc.header().find((h) => h.label === "Gemaakte uren").waarde === "3,5");
+  check("md: bestelling met | in ordernr", doc.bestellingen()[0].ordernr === "M1|2" && doc.bestellingen()[0].leverancier === "Mouser");
+  check("md: geen tijdelijk bestand blijft staan", fs.readdirSync(tm).length === 1);
+  const zonder = "---\nproject: X\n---\n\n# X\n\n## Logboek\n\n### 261001  Iets\n\ntekst\n\n## Technische referentie\n\n- niet in entry\n";
+  check("md: sectie na logboek hoort niet bij de entry", md.logboekEntries(zonder)[0].blokken.length === 1);
+  check("md: bestellingen-sectie aangemaakt vóór logboek", /## Bestellingen[\s\S]*## Logboek/.test(md.voegBestellingToe(zonder, { datum: "261001", leverancier: "TME" })));
+  const echt = path.join(__dirname, "voorbeeld.md");
+  if (fs.existsSync(echt)) {
+    const d = projectdoc.open(echt);
+    check("md: echt geconverteerd document leesbaar", d.entries().length > 5 && d.header().length > 3);
+  }
+  fs.rmSync(tm, { recursive: true, force: true });
+}
+
 console.log(`\n${mislukt ? `${mislukt} controle(s) mislukt` : "Alles in orde"}`);
 process.exit(mislukt ? 1 : 0);

@@ -15,6 +15,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { leesZip, pakUit } = require("./zip");
 const docx = require("./docx");
+const projectdoc = require("./projectdoc");
 
 const NR_OFFERTE = /\b((?:OF|PR)\d{6})\b/gi;
 const NR_FACTUUR = /\b((?:FA|CN|CA)\d{6})\b/gi;
@@ -428,9 +429,9 @@ function maakGeld({ projectenMap, offertesMap, facturenMap, boekhoudingPad, uren
   /* projectinfo voor het koppelen */
   function projectInfo(p) {
     return gecached(p.pad, () => {
-      const { xml } = docx.open(p.pad);
-      const tekst = docx.documentTekst(xml);
-      const header = docx.headerVelden(xml);
+      const doc = projectdoc.open(p.pad);
+      const tekst = doc.tekst();
+      const header = doc.header();
       const rel = path.relative(projectenMap, path.dirname(p.pad));
       const velden = header
         .filter((h) => /projectnummer|contact|bedrijf|eindklant|opdrachtgever|klant/i.test(h.label))

@@ -299,6 +299,17 @@
         `<div class="info-rij"><span class="il">${esc(v.label)}</span><span class="iv">${esc(v.waarde)}</span></div>`
       );
     }
+    const best = info.bestellingen || [];
+    if (best.length) {
+      delen.push(`<h3 class="info-kop">Bestellingen</h3>`);
+      for (const b of best) {
+        delen.push(
+          `<div class="info-rij"><span class="il">${esc(b.datum)} ${esc(b.leverancier)}</span>` +
+            `<span class="iv">${esc(b.wat)}${b.ordernr ? ` (${esc(b.ordernr)})` : ""}${b.bedrag ? `, ${esc(b.bedrag)}` : ""}` +
+            `${b.status ? ` <em>${esc(b.status)}</em>` : ""}</span></div>`
+        );
+      }
+    }
     delen.push(`<p class="hint">${(info.entries || []).length} entries in het logboek.</p>`);
     delen.push(`<p class="hint">Bestand: ${esc(info.bestand)}${info.map ? ` (map: ${esc(info.map)})` : ""}</p>`);
     $("info-inhoud").innerHTML = delen.join("");
@@ -1133,6 +1144,16 @@
       hl.appendChild(rij);
     });
 
+    const bestel = v.bestellingen || [];
+    $("voorstel-bestellingen").classList.toggle("hidden", !bestel.length);
+    $("voorstel-bestellingen-lijst").innerHTML = bestel
+      .map(
+        (b) =>
+          `<div class="info-rij"><span class="il">${esc(b.datum)} ${esc(b.leverancier)}</span>` +
+          `<span class="iv">${esc(b.wat)}${b.ordernr ? ` (${esc(b.ordernr)})` : ""}${b.bedrag ? `, ${esc(b.bedrag)}` : ""}</span></div>`
+      )
+      .join("");
+
     const vragen = v.vragen || [];
     $("voorstel-vragen").classList.toggle("hidden", !vragen.length);
     const vl = $("voorstel-vragen-lijst");
@@ -1190,6 +1211,7 @@
         project: state.project,
         entry: v.entry,
         headerWijzigingen: wijzigingen,
+        bestellingen: v.bestellingen || [],
       });
       gooiVoorstelWeg();
       $("notities").value = "";
@@ -1200,11 +1222,12 @@
       const bevestiging = $("opslag-bevestiging");
       const extra = uit.headerToegepast?.length ? ` Kopgegevens bijgewerkt: ${uit.headerToegepast.join(", ")}.` : "";
       const gemist = uit.headerOvergeslagen?.length
-        ? ` Niet gevonden in de kop-tabel: ${uit.headerOvergeslagen.join(", ")}.`
+        ? ` Niet gevonden in de kopgegevens: ${uit.headerOvergeslagen.join(", ")}.`
         : "";
+      const besteld = uit.bestellingenToegevoegd ? ` ${uit.bestellingenToegevoegd} bestelling(en) in de tabel Bestellingen gezet.` : "";
       bevestiging.innerHTML =
         `<h2>Opgeslagen</h2><p class="hint">Toegevoegd aan <strong>${esc(uit.bestand)}</strong>.` +
-        `${esc(extra)}${esc(gemist)} Een kopie van de vorige versie staat in de map <code>_backups</code>.</p>`;
+        `${esc(extra)}${esc(gemist)}${esc(besteld)} Een kopie van de vorige versie staat in de map <code>_backups</code>.</p>`;
       bevestiging.classList.remove("hidden");
       toast("Entry toegevoegd aan het projectdocument.");
       seinAssistent();
@@ -1470,7 +1493,7 @@
         titel: $("nieuw-titel").value.trim() || naam,
         sjabloon: $("nieuw-sjabloon").value,
       });
-      uitslag.textContent = `${uit.bestand} aangemaakt. Vul de kopgegevens nog even aan in Word.`;
+      uitslag.textContent = `${uit.bestand} aangemaakt. Vul de kopgegevens zo nodig nog aan.`;
       uitslag.classList.add("goed");
       $("nieuw-naam").value = "";
       $("nieuw-titel").value = "";

@@ -3,7 +3,7 @@
  * Projectdoc-bridge — draait op de pc die altijd aanstaat.
  *
  * De telefoon-app praat hiermee; deze bridge leest en schrijft de
- * Project_[Naam].docx bestanden in de OneDrive-map en laat Claude Code
+ * `Project <Naam>.md` bestanden (vroeger .docx) in de OneDrive-map en laat Claude Code
  * (op het abonnement waarmee op deze pc is ingelogd) het denkwerk doen.
  *
  * Rolverdeling, bewust zo:
@@ -19,14 +19,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 
-const docx = require("./lib/docx");
+const projectdoc = require("./lib/projectdoc");
 const { vraagClaude, vraagJson, zelftest, startwijze } = require("./lib/claude");
 const mailZoeker = require("./lib/mail");
 const { gekoppeld: mailGekoppeld } = require("./lib/graph");
 const { vraagPrompt, voorstelPrompt, SCHEMA_VOORSTEL } = require("./lib/prompts");
 const { maakGeld, samenvatting: geldSamenvatting } = require("./lib/geld");
 
-const VERSIE = "1.15.0";
+const VERSIE = "1.16.0";
 const MAX_BODY = 2 * 1024 * 1024;
 const CONFIG_PAD = process.env.PROJECTDOC_CONFIG || path.join(__dirname, "config.json");
 
@@ -87,11 +87,11 @@ const geld = maakGeld({
 // Archiefmappen bevatten oudere kopieën van dezelfde projecten; die horen niet
 // in de keuzelijst thuis, anders kies je er zo eentje per ongeluk.
 const OVERSLAAN = [/^_backups$/i, /^node_modules$/i, /^\.git$/i, /^archief$/i, /^archive$/i, /^oud$/i];
-const PROJECTBESTAND = /^Project[ _].+\.docx$/i;
+const PROJECTBESTAND = /^Project[ _].+\.(md|docx)$/i;
 // Een kopie herken je aan een markering áán het eind van de naam, eventueel
 // gevolgd door een datum: "..._backup_260831b.docx", "... - kopie.docx". Een
 // project dat toevallig over back-ups gáát blijft gewoon staan.
-const KOPIE = /[ _-](backup|bak|kopie|copy|old|oud)([ _-]?\d{0,8}[a-z]?)?\.docx$|\(\d+\)\.docx$/i;
+const KOPIE = /[ _-](backup|bak|kopie|copy|old|oud)([ _-]?\d{0,8}[a-z]?)?\.(md|docx)$|\(\d+\)\.(md|docx)$/i;
 let projectCache = { tijd: 0, lijst: [] };
 
 function zoekProjecten(map, diepte = 0) {
@@ -118,7 +118,7 @@ function zoekProjecten(map, diepte = 0) {
       uit.push({
         naam: item.name
           .replace(/^Project[ _]/i, "")
-          .replace(/\.docx$/i, "")
+          .replace(/\.(md|docx)$/i, "")
           .replace(/_/g, " ")
           .trim(),
         bestand: item.name,
@@ -133,7 +133,14 @@ function zoekProjecten(map, diepte = 0) {
 
 function projecten(ververs = false) {
   if (!ververs && Date.now() - projectCache.tijd < 15000) return projectCache.lijst;
-  const lijst = zoekProjecten(config.projectenMap).sort(
+  // Staan .md en .docx van hetzelfde project naast elkaar (tijdens de overstap), dan wint de .md.
+  const perProject = new Map();
+  for (const p of zoekProjecten(config.projectenMap)) {
+    const sleutel = `${path.dirname(p.pad)}|${p.naam.toLowerCase()}`;
+    const bestaand = perProject.get(sleutel);
+    if (!bestaand || (projectdoc.isMd(p.pad) && !projectdoc.isMd(bestaand.pad))) perProject.set(sleutel, p);
+  }
+  const lijst = [...perProject.values()].sort(
     (a, b) => new Date(b.gewijzigd) - new Date(a.gewijzigd)
   );
   projectCache = { tijd: Date.now(), lijst };
@@ -189,13 +196,14 @@ function maakBackup(bestandsPad) {
   const map = path.join(config.projectenMap, "_backups");
   fs.mkdirSync(map, { recursive: true });
   const stempel = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
-  const doel = path.join(map, `${path.basename(bestandsPad, ".docx")}_${stempel}.docx`);
+  const ext = path.extname(bestandsPad);
+  const doel = path.join(map, `${path.basename(bestandsPad, ext)}_${stempel}${ext}`);
   fs.copyFileSync(bestandsPad, doel);
 
   // Oude back-ups opruimen, anders groeit dit ongemerkt in OneDrive.
   const oud = fs
     .readdirSync(map)
-    .filter((n) => n.endsWith(".docx"))
+    .filter((n) => /\.(md|docx)$/i.test(n))
     .map((n) => ({ n, t: fs.statSync(path.join(map, n)).mtimeMs }))
     .sort((a, b) => b.t - a.t)
     .slice(config.maxBackups);
@@ -296,14 +304,15 @@ async function afhandelen(req, res, url) {
   if (pad === "/api/project" && req.method === "GET") {
     const p = zoekProject(url.searchParams.get("naam"));
     if (!p) return { fout: "Project niet gevonden" };
-    const { xml } = docx.open(p.pad);
+    const doc = projectdoc.open(p.pad);
     return {
       naam: p.naam,
       bestand: p.bestand,
       map: p.map,
       gewijzigd: p.gewijzigd,
-      header: docx.headerVelden(xml),
-      entries: docx.logboekEntries(xml),
+      header: doc.header(),
+      entries: doc.entries(),
+      bestellingen: doc.bestellingen(),
     };
   }
 
@@ -332,8 +341,8 @@ async function afhandelen(req, res, url) {
     const p = zoekProject(body.project);
     if (!p) return { fout: "Project niet gevonden" };
     if (!String(body.vraag || "").trim()) return { fout: "Geen vraag meegegeven" };
-    const { xml } = docx.open(p.pad);
-    const mail = await mailVoor(p, docx.headerVelden(xml));
+    const doc = projectdoc.open(p.pad);
+    const mail = await mailVoor(p, doc.header());
     let geldTekst = "";
     try {
       geldTekst = geldSamenvatting(geld.voorProject(p.naam, projecten()));
@@ -344,7 +353,7 @@ async function afhandelen(req, res, url) {
       vraagPrompt({
         projectNaam: p.naam,
         geld: geldTekst,
-        documentTekst: docx.documentTekst(xml),
+        documentTekst: doc.tekst(),
         vraag: body.vraag,
         historie: body.historie,
         mail: mail.berichten,
@@ -387,8 +396,8 @@ async function afhandelen(req, res, url) {
     const p = zoekProject(body.project);
     if (!p) return { fout: "Project niet gevonden" };
     if (!String(body.notities || "").trim()) return { fout: "Geen notities meegegeven" };
-    const { xml } = docx.open(p.pad);
-    const header = docx.headerVelden(xml);
+    const doc = projectdoc.open(p.pad);
+    const header = doc.header();
     bewaarVoorstel(p.naam, { bezig: true });
     const mail = await mailVoor(p, header);
     let data, duurMs;
@@ -396,7 +405,7 @@ async function afhandelen(req, res, url) {
       ({ data, duurMs } = await vraagJson(
         voorstelPrompt({
           projectNaam: p.naam,
-          documentTekst: docx.documentTekst(xml),
+          documentTekst: doc.tekst(),
           headerVelden: header,
           notities: body.notities,
           historie: body.historie,
@@ -432,25 +441,29 @@ async function afhandelen(req, res, url) {
     const entry = body.entry;
     if (!entry || !entry.kop) return { fout: "Geen entry meegegeven" };
 
-    const { onderdelen, xml } = docx.open(p.pad);
-    let nieuw = xml;
+    const doc = projectdoc.open(p.pad);
     const toegepast = [];
     const overgeslagen = [];
     for (const w of body.headerWijzigingen || []) {
-      const uit = docx.zetHeaderWaarde(nieuw, w.label, w.nieuweWaarde);
-      if (uit) {
-        nieuw = uit;
-        toegepast.push(w.label);
-      } else {
-        overgeslagen.push(w.label);
-      }
+      if (doc.zetHeader(w.label, w.nieuweWaarde)) toegepast.push(w.label);
+      else overgeslagen.push(w.label);
     }
-    nieuw = docx.voegEntryToe(nieuw, entry);
+    doc.voegEntryToe(entry);
+    // Bestellingen uit het voorstel ook in de tabel, oudste eerst zodat de nieuwste bovenaan komt
+    const bestellingen = (body.bestellingen || []).filter((b) => b && (b.leverancier || b.wat));
+    for (const b of [...bestellingen].sort((a, b2) => String(a.datum).localeCompare(String(b2.datum)))) doc.voegBestellingToe(b);
 
     const backup = maakBackup(p.pad);
-    docx.bewaar(p.pad, onderdelen, nieuw);
+    doc.bewaar();
     projectCache.tijd = 0;
-    return { ok: true, bestand: p.bestand, backup, headerToegepast: toegepast, headerOvergeslagen: overgeslagen };
+    return {
+      ok: true,
+      bestand: p.bestand,
+      backup,
+      headerToegepast: toegepast,
+      headerOvergeslagen: overgeslagen,
+      bestellingenToegevoegd: doc.soort === "md" ? bestellingen.length : 0,
+    };
   }
 
   if (pad === "/api/geld" && req.method === "GET") {
@@ -504,24 +517,11 @@ async function afhandelen(req, res, url) {
     const body = await leesBody(req);
     const naam = String(body.naam || "").trim();
     if (!/^[\w \-&.()]{2,60}$/.test(naam)) return { fout: "Ongeldige projectnaam" };
-    const sjabloon = zoekProject(body.sjabloon) || projecten()[0];
-    if (!sjabloon) return { fout: "Geen bestaand project om de opmaak van over te nemen" };
-
-    // Neem de naamgeving over van het sjabloon: sommige mappen gebruiken een
-    // spatie na "Project", andere een underscore.
-    const scheiding = /^Project_/i.test(sjabloon.bestand) ? "_" : " ";
-    const bestandsnaam = `Project${scheiding}${naam}.docx`;
+    // Altijd Markdown, met een spatie na "Project" (afspraak sinds november 2026)
+    const bestandsnaam = `Project ${naam}.md`;
     const doel = path.join(config.projectenMap, bestandsnaam);
     if (fs.existsSync(doel)) return { fout: `${bestandsnaam} bestaat al` };
-
-    const { onderdelen, xml } = docx.open(sjabloon.pad);
-    let nieuw = docx.leegLogboek(xml);
-    nieuw = docx.zetTitel(nieuw, body.titel || naam);
-    for (const [label, waarde] of Object.entries(body.header || {})) {
-      const uit = docx.zetHeaderWaarde(nieuw, label, waarde);
-      if (uit) nieuw = uit;
-    }
-    docx.bewaar(doel, onderdelen, nieuw);
+    projectdoc.maakNieuw(doel, { titel: body.titel || naam, header: { Project: naam, ...(body.header || {}) } });
     projectCache.tijd = 0;
     return { ok: true, bestand: bestandsnaam, naam };
   }

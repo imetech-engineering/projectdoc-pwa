@@ -1032,3 +1032,4 @@ body:has(.invoer-sticky-bar:not(.hidden)) #toast, body:has(.install-banner:not(.
 
 /* Echte schermhoogte (gemeten in melding.js), zodat de balk onderin na vernieuwen in beeld blijft. */
 html body { height: var(--app-h, 100dvh); }
+.info-kop { margin: 14px 0 4px; font-size: 0.9rem; }

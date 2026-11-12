@@ -89,9 +89,25 @@ const SCHEMA_VOORSTEL = {
         additionalProperties: false,
       },
     },
+    bestellingen: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          datum: { type: "string" },
+          leverancier: { type: "string" },
+          ordernr: { type: "string" },
+          wat: { type: "string" },
+          bedrag: { type: "string" },
+          status: { type: "string" },
+        },
+        required: ["datum", "leverancier", "ordernr", "wat", "bedrag", "status"],
+        additionalProperties: false,
+      },
+    },
     vragen: { type: "array", items: { type: "string" } },
   },
-  required: ["duplicaat", "duplicaatToelichting", "entry", "headerWijzigingen", "vragen"],
+  required: ["duplicaat", "duplicaatToelichting", "entry", "headerWijzigingen", "bestellingen", "vragen"],
   additionalProperties: false,
 };
 
@@ -227,7 +243,9 @@ Kopgegevens pas je alleen aan als de notities daar duidelijk aanleiding toe geve
 - een statuswijziging ("akkoord", "afgerond", "on hold") → het veld dat de status bevat
 - gewerkte uren → tel op bij het bestaande aantal, overschrijf nooit
 - een gewijzigd uurtarief, nieuw ordernummer of andere contactpersoon
-Geef bij een wijziging altijd de VOLLEDIGE nieuwe waarde van dat veld, in exact dezelfde opmaak als de huidige waarde. Is er niets te wijzigen, dan is headerWijzigingen een lege lijst.`;
+Geef bij een wijziging altijd de VOLLEDIGE nieuwe waarde van dat veld, in exact dezelfde opmaak als de huidige waarde. Is er niets te wijzigen, dan is headerWijzigingen een lege lijst.
+
+Bestellingen: noemen de notities een inkoopbestelling die ${initialen} zelf bij een leverancier heeft geplaatst (onderdelen, PCB's, PCBA, materiaal), zet die dan ook in "bestellingen": één regel per order, datum als JJMMDD, ordernummer letterlijk of leeg, "wat" kort, bedrag zoals genoemd of leeg, status "besteld" (of "geleverd"/"geannuleerd" als dat er staat). Geen bestellingen van de klant bij IMeTech en niets wat alleen nog besteld moet worden. Kijk in de tabel Bestellingen in het document of hetzelfde al eerder besteld is; lijkt dat zo, zet het dan als vraag in "vragen" (dubbel bestellen voorkomen). Geen bestelling genoemd: lege lijst.`;
 }
 
 module.exports = { vraagPrompt, voorstelPrompt, SCHEMA_VOORSTEL, stijlregels, mailBlok, vandaag };

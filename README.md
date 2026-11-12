@@ -1,8 +1,8 @@
 # IMeTech Projectdocumentatie
 
 Projectlogboeken bijwerken en raadplegen vanaf de telefoon — met spraak, in
-natuurlijke taal, rechtstreeks in de bestaande `Project <Naam>.docx` bestanden
-in OneDrive.
+natuurlijke taal, rechtstreeks in de `Project <Naam>.md` bestanden in OneDrive
+(sinds november 2026 Markdown; oude `.docx` worden nog gelezen zolang ze niet omgezet zijn).
 
 De app draait op je Claude-abonnement. Er is **geen API-sleutel** en er zijn
 **geen losse API-kosten**: het denkwerk gebeurt door Claude Code op je eigen pc.
@@ -13,7 +13,7 @@ De app draait op je Claude-abonnement. Er is **geen API-sleutel** en er zijn
 Telefoon                     Jouw pc (staat altijd aan)
 ┌─────────────────┐          ┌──────────────────────────────────┐
 │  PWA            │  https   │  bridge (node)                   │
-│  GitHub Pages   ├─────────►│    ├─ leest/schrijft .docx       │
+│  GitHub Pages   ├─────────►│    ├─ leest/schrijft .md         │
 │  spraak in/uit  │  token   │    └─ vraagt Claude Code om tekst │
 └─────────────────┘          │                ▼                 │
                              │  OneDrive-map met projecten      │
@@ -27,10 +27,11 @@ Bewuste rolverdeling:
 - **De bridge** doet bestanden: openen, entry invoegen, kopgegevens bijwerken,
   back-up maken, opslaan.
 
-Claude komt dus nooit zelf aan een bestand. Nieuwe alinea's krijgen letterlijk
-de opmaakeigenschappen van een bestaande alinea van hetzelfde soort uit
-hetzelfde document, en alle onderdelen die niet veranderen worden byte voor
-byte overgenomen. Daardoor blijft de opmaak precies zoals Word hem had staan.
+Claude komt dus nooit zelf aan een bestand. Het document is Markdown met
+kopgegevens als YAML-frontmatter, een tabel `## Bestellingen` en een
+`## Logboek` met entries `### JJMMDD  Titel` (nieuwste eerst). Noemt een
+notitie een bestelling, dan komt die ook in de tabel Bestellingen, en Claude
+waarschuwt als iets al eerder besteld lijkt.
 
 ## Wat je ermee doet
 
@@ -157,8 +158,8 @@ Controleren of het docx-werk klopt, zonder internet of Claude:
 node test/test.js
 ```
 
-Welke bestanden meetellen: alles dat `Project <naam>.docx` of `Project_<naam>.docx`
-heet. Kopieën (`... - kopie.docx`, `..._backup_260831.docx`) en de inhoud van
+Welke bestanden meetellen: alles dat `Project <naam>.md` heet (en nog `Project <naam>.docx`,
+heet. zolang er geen .md naast staat). Kopieën (`... - kopie.md`, `..._backup_260831.md`) en de inhoud van
 `Archief`-mappen blijven buiten de lijst, zodat je niet per ongeluk in een oude
 versie schrijft.
 
@@ -268,7 +269,9 @@ pwa/                 de app (GitHub Pages)
   js/opslag.js       instellingen, concepten en gesprekken op het toestel
 bridge/
   server.js          de webserver op je pc
-  lib/docx.js        lezen en bewerken van Project_*.docx
+  lib/md.js          lezen en bewerken van Project <Naam>.md (Markdown)
+  lib/projectdoc.js  één ingang voor .md en .docx
+  lib/docx.js        lezen van oude Project_*.docx en offertes
   lib/zip.js         zip-lezer/schrijver zonder externe pakketten
   lib/claude.js      aanroepen van Claude Code
   lib/prompts.js     de instructies en de stijlregels van het logboek
