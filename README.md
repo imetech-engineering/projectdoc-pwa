@@ -159,7 +159,7 @@ node test/test.js
 ```
 
 Welke bestanden meetellen: alles dat `Project <naam>.md` heet (en nog `Project <naam>.docx`,
-heet. zolang er geen .md naast staat). Kopieën (`... - kopie.md`, `..._backup_260831.md`) en de inhoud van
+zolang er geen .md naast staat). Kopieën (`... - kopie.md`, `..._backup_260831.md`) en de inhoud van
 `Archief`-mappen blijven buiten de lijst, zodat je niet per ongeluk in een oude
 versie schrijft.
 
