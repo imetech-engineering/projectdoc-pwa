@@ -10,8 +10,10 @@
  *   # Titel
  *
  *   ## Bestellingen
- *   | Datum | Leverancier | Ordernr | Wat | Bedrag | Status |
- *   |---|---|---|---|---|---|
+ *   | Datum | Leverancier | Ordernr | Wat | Bedrag | Status | Factuur |
+ *   |---|---|---|---|---|---|---|
+ *   (oudere bestanden hebben nog 6 kolommen zonder Factuur; die blijven zo
+ *   tot de assistent er een inkoopfactuur aan koppelt)
  *
  *   ## Logboek
  *
@@ -25,9 +27,9 @@
 
 const FM = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 const ENTRYKOP = /^#{2,4}[ \t]+(\d{6})[ \t]+(.+?)\s*$/;
-const BESTELKOLOMMEN = ["datum", "leverancier", "ordernr", "wat", "bedrag", "status"];
-const BESTELKOP = "| Datum | Leverancier | Ordernr | Wat | Bedrag | Status |";
-const BESTELSEP = "|---|---|---|---|---|---|";
+const BESTELKOLOMMEN = ["datum", "leverancier", "ordernr", "wat", "bedrag", "status", "factuur"];
+const BESTELKOP = "| Datum | Leverancier | Ordernr | Wat | Bedrag | Status | Factuur |";
+const BESTELSEP = "|---|---|---|---|---|---|---|";
 
 /* Labels zoals de app en de prompts ze kennen <-> sleutels in de frontmatter */
 const LABELS = {
@@ -155,10 +157,10 @@ function bestellingen(tekst) {
   return uit;
 }
 
-function bestelRij(b) {
+function bestelRij(b, breed = BESTELKOLOMMEN.length) {
   return (
     "| " +
-    BESTELKOLOMMEN.map((k) => String(b[k] ?? "").replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim()).join(" | ") +
+    BESTELKOLOMMEN.slice(0, Math.max(6, Math.min(breed, BESTELKOLOMMEN.length))).map((k) => String(b[k] ?? "").replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim()).join(" | ") +
     " |"
   );
 }
@@ -179,7 +181,8 @@ function voegBestellingToe(tekst, b) {
     return tekst.slice(0, s.begin) + nieuw + tekst.slice(s.eind);
   }
   const pos = s.begin + sep.index + sep[0].length;
-  return tekst.slice(0, pos) + "\n" + bestelRij(b) + tekst.slice(pos);
+  const breed = cellen(sep[0]).length; // nieuwe rij even breed als de bestaande tabel
+  return tekst.slice(0, pos) + "\n" + bestelRij(b, breed) + tekst.slice(pos);
 }
 
 /* ---------------------------------------------------------------- logboek */
